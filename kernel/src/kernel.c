@@ -20,14 +20,17 @@ int main(int argc, char **argv)
 	}
 	leer_config();
 
-	// Conexión con los módulos: Memoria y CPU (Dispatch e Interrupt)
-	fd_memoria = crear_conexion2(IP_MEMORIA, PUERTO_MEMORIA);
+	// Conexión con Memoria: ESTO SERA REMOVIDO (LA CONEXION SOLO SE HARA CUANDO SE NECESITE ALGO DE LA RAM)
+	fd_memoria = crear_conexion2(IP_MEMORIA, PUERTO_MEMORIA); // 
 	if (fd_memoria == -1)
 	{
 		log_error(logger_obligatorio, "Fallo la conexión con Memoria");
 		terminar_programa();
 		exit(1);
 	}
+	enviar_mensaje("Hola memoria, Soy Kernel!", fd_memoria);
+
+	// Conexión con CPU (Dispatch e Interrupt)
 	fd_cpu_dispatch = crear_conexion2(IP_CPU, PUERTO_CPU_DISPATCH);
 	if (fd_cpu_dispatch == -1)
 	{
@@ -42,9 +45,7 @@ int main(int argc, char **argv)
 		terminar_programa();
 		exit(1);
 	}
-
 	// Mensajes iniciales de saludo a los módulos
-	enviar_mensaje("Hola memoria, Soy Kernel!", fd_memoria);
 	enviar_mensaje("Hola CPU interrupt, Soy Kernel!", fd_cpu_interrupt);
 	enviar_mensaje("Hola CPU dispatcher, Soy Kernel!", fd_cpu_dispatch);
 

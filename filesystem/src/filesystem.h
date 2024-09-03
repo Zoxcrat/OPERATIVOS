@@ -19,7 +19,6 @@ t_log* logger_obligatorio;
 t_config* config;
 
 //t_contexto_ejecucion* contexto_de_ejecucion;
-int socket_cliente;
 int filesystem_socket;
 
 // Variables del config (Las pongo aca asi no estamos revoleando el cfg para todos lados)
@@ -35,6 +34,8 @@ t_log_level LOG_LEVEL;
 
 // INIT
 void leer_config();
+void* procesar_conexion(void* arg);
+void* procesar_peticion(void* arg);
 void terminar_programa();
 
 #endif

@@ -26,7 +26,6 @@ int main(int argc, char **argv) {
 		terminar_programa();
 		exit(1);
 	}
-	enviar_mensaje("Hola Memoria, soy CPU!", fd_memoria);
 
 	// Iniciar servidor de Dispatch
 	int dispatch_socket = iniciar_servidor(logger, IP_ESCUCHA, PUERTO_ESCUCHA_DISPATCH);
@@ -40,17 +39,30 @@ int main(int argc, char **argv) {
         log_error(logger, "Error al iniciar el servidor de interrupt");
         return EXIT_FAILURE;
     }
-	
-	if (socket_cliente_dispatch == -1 || socket_cliente_interrupt == -1 ) {
-		log_info(logger, "Hubo un error en la conexion del Kernel");
-	}
-	
-	while (1)
-	{
-		socket_cliente_dispatch = esperar_cliente(dispatch_socket, logger);\
-		socket_cliente_interrupt = esperar_cliente(interrupt_socket, logger);
-	}
-	
+	//////////////
+	while (1) {
+        int socket_cliente_dispatch = esperar_cliente(dispatch_socket, logger);
+        if (socket_cliente_dispatch != -1) {
+            pthread_t hilo_dispatch;
+            if (pthread_create(&hilo_dispatch, NULL, manejar_cliente_dispatch, (void*)socket_cliente_dispatch) != 0) {
+                log_error(logger, "Error al crear el hilo para dispatch");
+                close(socket_cliente_dispatch);
+            } else {
+                pthread_detach(hilo_dispatch);
+            }
+        }
+
+        int socket_cliente_interrupt = esperar_cliente(interrupt_socket, logger);
+        if (socket_cliente_interrupt != -1) {
+            pthread_t hilo_interrupt;
+            if (pthread_create(&hilo_interrupt, NULL, manejar_cliente_interrupt, (void*)socket_cliente_interrupt) != 0) {
+                log_error(logger, "Error al crear el hilo para interrupt");
+                close(socket_cliente_interrupt);
+            } else {
+                pthread_detach(hilo_interrupt);
+            }
+        }
+    }
 	terminar_programa();
 	return 0;
 }
@@ -65,7 +77,24 @@ void leer_config()
 	char *log_level = config_get_string_value(config, "LOG_LEVEL");
 	LOG_LEVEL = log_level_from_string(log_level);
 }
+// Funciones para manejar conexiones
+void* manejar_cliente_dispatch(void* socket_cliente) {
+    int socket = (int)socket_cliente;
+    // Maneja la petición del cliente dispatch aquí
+    // ...
 
+    close(socket);
+    return NULL;
+}
+
+void* manejar_cliente_interrupt(void* socket_cliente) {
+    int socket = (int)socket_cliente;
+    // Maneja la petición del cliente interrupt aquí
+    // ...
+
+    close(socket);
+    return NULL;
+}
 void terminar_programa(){
 	log_destroy(logger);
 	log_destroy(logger_obligatorio);

@@ -40,6 +40,8 @@ t_log_level LOG_LEVEL;
 
 // INIT
 void leer_config();
+void* procesar_conexion(void* arg);
+void* procesar_peticion(void* arg);
 void terminar_programa();
 
 #endif

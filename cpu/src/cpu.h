@@ -33,6 +33,8 @@ t_log_level LOG_LEVEL;
 
 // INIT
 void leer_config();
+void* manejar_cliente_dispatch(void* socket_cliente);
+void* manejar_cliente_interrupt(void* socket_cliente);
 void terminar_programa();
 
 #endif
