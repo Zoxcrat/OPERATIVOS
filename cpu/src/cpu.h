@@ -25,10 +25,10 @@ int socket_cliente_interrupt;
 // Variables del config (Las pongo aca asi no estamos revoleando el cfg para todos lados)
 
 char* IP_ESCUCHA;
-char* IP_MEMORIA;
-char* PUERTO_MEMORIA;
 char* PUERTO_ESCUCHA_DISPATCH;
 char* PUERTO_ESCUCHA_INTERRUPT;
+char* IP_MEMORIA;
+char* PUERTO_MEMORIA;
 t_log_level LOG_LEVEL;
 
 // INIT

@@ -45,8 +45,8 @@ int main(int argc, char **argv)
 
 	// Mensajes iniciales de saludo a los módulos
 	enviar_mensaje("Hola memoria, Soy Kernel!", fd_memoria);
-	enviar_mensaje("Hola CPU Dispatch, Soy Kernel!", fd_cpu_dispatch);
-	enviar_mensaje("Hola CPU Interrupt, Soy Kernel!", fd_cpu_interrupt);
+	enviar_mensaje("Hola CPU interrupt, Soy Kernel!", fd_cpu_interrupt);
+	enviar_mensaje("Hola CPU dispatcher, Soy Kernel!", fd_cpu_dispatch);
 
 	// planificar();
 

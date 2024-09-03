@@ -28,14 +28,15 @@ int main(int argc, char **argv) {
 	}
 	enviar_mensaje("Hola Filesystem, soy la Memoria!", fd_filesystem);
 
-	// Iniciar servidor de Dispatch
+	// Iniciar servidor de Memoria
 	memoria_socket = iniciar_servidor(logger, IP_ESCUCHA, PUERTO_ESCUCHA);
     if (memoria_socket == -1) {
         log_error(logger, "Error al iniciar el servidor de la memoria");
         return EXIT_FAILURE;
     }
+	while (1){
 	socket_cliente = esperar_cliente(memoria_socket, logger);
-
+	}
 	terminar_programa();
 	return 0;
 }

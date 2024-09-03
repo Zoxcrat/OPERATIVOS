@@ -34,18 +34,21 @@ int main(int argc, char **argv) {
         log_error(logger, "Error al iniciar el servidor de dispatch");
         return EXIT_FAILURE;
     }
-	socket_cliente_dispatch = esperar_cliente(dispatch_socket, logger);
-
     // Iniciar servidor de Interrupt
     int interrupt_socket = iniciar_servidor(logger, IP_ESCUCHA, PUERTO_ESCUCHA_INTERRUPT);
     if (interrupt_socket == -1) {
         log_error(logger, "Error al iniciar el servidor de interrupt");
         return EXIT_FAILURE;
     }
-	socket_cliente_interrupt = esperar_cliente(interrupt_socket, logger);
-
+	
 	if (socket_cliente_dispatch == -1 || socket_cliente_interrupt == -1 ) {
 		log_info(logger, "Hubo un error en la conexion del Kernel");
+	}
+	
+	while (1)
+	{
+		socket_cliente_dispatch = esperar_cliente(dispatch_socket, logger);\
+		socket_cliente_interrupt = esperar_cliente(interrupt_socket, logger);
 	}
 	
 	terminar_programa();
@@ -57,8 +60,8 @@ void leer_config()
 	IP_MEMORIA = config_get_string_value(config, "IP_MEMORIA");
 	PUERTO_MEMORIA = config_get_string_value(config, "PUERTO_MEMORIA");
 	IP_ESCUCHA = config_get_string_value(config, "IP_ESCUCHA");
-	PUERTO_ESCUCHA_DISPATCH = config_get_string_value(config, "PUERTO_CPU_DISPATCH");
-	PUERTO_ESCUCHA_INTERRUPT = config_get_string_value(config, "IP_MEMORIA");
+	PUERTO_ESCUCHA_DISPATCH = config_get_string_value(config, "PUERTO_ESCUCHA_DISPATCH");
+	PUERTO_ESCUCHA_INTERRUPT = config_get_string_value(config, "PUERTO_ESCUCHA_INTERRUPT");
 	char *log_level = config_get_string_value(config, "LOG_LEVEL");
 	LOG_LEVEL = log_level_from_string(log_level);
 }
