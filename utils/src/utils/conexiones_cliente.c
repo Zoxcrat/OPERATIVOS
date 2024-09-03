@@ -1,4 +1,5 @@
 #include "conexiones_cliente.h"
+
 void* serializar_paquete(t_paquete* paquete, int bytes){
 	void *magic = malloc(bytes);
 	int desplazamiento = 0;

@@ -16,11 +16,12 @@
  * @param puerto determina el puerto
  * @return retorna elsocket del servidor
 */
-int iniciar_servidor(char*);
+int iniciar_servidor(t_log *logger, char *ip, char *puerto);
 /**
  * @fn esperar_cliente
  * @brief Espera a que el cliente se conecte al servidor
- * @param socket_servidor Cual es el socket en el que se enceuntra el servidor. 
+ * @param ip Cual es el ip en el que se enceuntra el servidor. 
+ * @param puerto Cual es el ip en el que se enceuntra el servidor. 
  * @param logger puntero del archivo log al cual se enviara el estado.
  * @return retorna elsocket del cliente que se conecto
 */

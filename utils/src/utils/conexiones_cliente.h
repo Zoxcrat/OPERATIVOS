@@ -10,56 +10,23 @@
 #include <commons/log.h>
 #include <commons/string.h>
 
-typedef enum {
-	MOD_KERNEL,
-	MOD_CPU,
-	MOD_MEMORIA,
-	MOD_IO
-} modulos;
-
 typedef enum
 {
 	MENSAJE,
-	PAQUETE,
-	MEM_ENVIAR_INSTRUCCION,
-    MEM_CREAR_PROCESO,
-    MEM_FINALIZAR_PROCESO,
-    MEM_ACCESO_TABLA_PAGINAS,
-    MEM_RESIZE_PROCESO,
-    MEM_LEER_MEMORIA,
-    MEM_ESCRIBIR_MEMORIA,
-	KER_STDIN_READ,
-	KER_STDOUT_WRITE,
-	IO_GEN_SLEEP,
-    IO_STDIN_READ,
-    IO_STDOUT_WRITE,
-    IO_FS_CREATE,
-    IO_FS_DELETE,
-    IO_FS_TRUNCATE,
-    IO_FS_WRITE,
-    IO_FS_READ,
-	CPU_INTERRUPT,
-	CPU_EXEC_PROC,
-	KER_CDE
-} op_code;
+	PAQUETE
+}op_code;
 
 typedef struct
 {
 	int size;
-	void *stream;
+	void* stream;
 } t_buffer;
 
 typedef struct
 {
 	op_code codigo_operacion;
-	t_buffer *buffer;
+	t_buffer* buffer;
 } t_paquete;
-
-typedef struct
-{
-	int uTrabajo;
-} t_genSleep;
-
 
 /**
  * @fn crear_conexion
