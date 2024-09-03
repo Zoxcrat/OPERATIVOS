@@ -77,12 +77,3 @@ t_list *recibir_paquete(int socket_cliente)
     free(buffer);
     return valores;
 }
-
-int recibir_entero(int socket_cliente)
-{
-    char *rta = recibir_msg(socket_cliente);
-
-    int valor = atoi(rta);
-    free(rta);
-    return valor;
-}

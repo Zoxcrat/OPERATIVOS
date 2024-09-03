@@ -6,19 +6,14 @@ int main(int argc, char **argv) {
 		return EXIT_FAILURE;
 	}
 
-	config = config_create(argv[1]);
+	logger_obligatorio = log_create("filesystem_obligatorio.log", "filesystem_obligatorio", 1, LOG_LEVEL);
+	logger = log_create("filesystem.log", "filesystem", 1, LOG_LEVEL);
+
+	config = config_create("/home/utnso/Desktop/TP/tp-2024-2c-LAMBDA/filesystem/src/filesystem.config");
 	if (config == NULL)
 	{
 		log_error(logger, "No se encontró el archivo :(");
 		config_destroy(config);
-		exit(1);
-	}
-	leer_config();
-    
-	logger_obligatorio = log_create("filesystem.log", "filesystem_obligatorio", 1, LOG_LEVEL);
-	if(config == NULL){
-		log_error(logger, "No se encontró el archivo :(");
-		terminar_programa();
 		exit(1);
 	}
 	leer_config();
@@ -29,10 +24,12 @@ int main(int argc, char **argv) {
         log_error(logger, "Error al iniciar el servidor del Filesystem");
         return EXIT_FAILURE;
     }
+	while (1){
 	socket_cliente = esperar_cliente(filesystem_socket, logger);
-
+	}
 	terminar_programa();
 	return 0;
+
 }
 
 void leer_config()

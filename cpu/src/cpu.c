@@ -6,7 +6,10 @@ int main(int argc, char **argv) {
 		return EXIT_FAILURE;
 	}
 
-	config = config_create(argv[1]);
+	logger_obligatorio = log_create("cpu_obligatorio.log", "cpu_obligatorio", 1, LOG_LEVEL);
+	logger = log_create("cpu.log", "cpu", 1, LOG_LEVEL);
+
+	config = config_create("/home/utnso/Desktop/TP/tp-2024-2c-LAMBDA/cpu/src/cpu.config");
 	if (config == NULL)
 	{
 		log_error(logger, "No se encontró el archivo :(");
@@ -15,14 +18,6 @@ int main(int argc, char **argv) {
 	}
 	leer_config();
     
-	logger_obligatorio = log_create("cpu.log", "cpu_obligatorio", 1, LOG_LEVEL);
-	if(config == NULL){
-		log_error(logger, "No se encontró el archivo :(");
-		terminar_programa();
-		exit(1);
-	}
-	leer_config();
-
 	// Conecto CPU con memoria
 	fd_memoria = crear_conexion2(IP_MEMORIA, PUERTO_MEMORIA);
 	if (fd_memoria == -1)

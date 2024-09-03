@@ -57,7 +57,6 @@ t_list* recibir_paquete(int);
 int recibir_operacion(int);
 
 int recibir_entero(int);
-char *recibir_msg(int socket_cliente);
 
 /**
  * Similar a esperar_cliente, pero no recibe la operación ni mensaje (hecho para poder

@@ -6,7 +6,10 @@ int main(int argc, char **argv) {
 		return EXIT_FAILURE;
 	}
 
-	config = config_create(argv[1]);
+	logger_obligatorio = log_create("memoria_obligatorio.log", "memoria_obligatorio", 1, LOG_LEVEL);
+	logger = log_create("memoria.log", "memoria", 1, LOG_LEVEL);
+
+	config = config_create("/home/utnso/Desktop/TP/tp-2024-2c-LAMBDA/memoria/src/memoria.config");
 	if (config == NULL)
 	{
 		log_error(logger, "No se encontró el archivo :(");
@@ -14,18 +17,10 @@ int main(int argc, char **argv) {
 		exit(1);
 	}
 	leer_config();
-    
-	logger_obligatorio = log_create("memoria.log", "memoria_obligatorio", 1, LOG_LEVEL);
-	if(config == NULL){
-		log_error(logger, "No se encontró el archivo :(");
-		terminar_programa();
-		exit(1);
-	}
-	leer_config();
 
 	// Conecto Memoria con Filesystem
 	fd_filesystem = crear_conexion2(IP_FILESYSTEM, PUERTO_FILESYSTEM);
-	if (fd_memoria == -1)
+	if (fd_filesystem == -1)
 	{
 		log_error(logger_obligatorio, "Fallo la conexión con Filesystem");
 		terminar_programa();

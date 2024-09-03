@@ -28,8 +28,6 @@ int fd_memoria;
 int fd_cpu_interrupt;
 int fd_cpu_dispatch;
 // Variables del config (Las pongo aca asi no estamos revoleando el cfg para todos lados)
-char* IP;
-char* PUERTO;
 char* IP_CPU;
 char* PUERTO_CPU_DISPATCH;
 char* PUERTO_CPU_INTERRUPT;

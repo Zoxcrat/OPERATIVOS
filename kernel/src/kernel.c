@@ -7,7 +7,11 @@ int main(int argc, char **argv)
 		return EXIT_FAILURE;
 	}
 
-	config = config_create("./kernel.config");
+	// Crear loggers con el nivel de log desde la configuración
+	logger = log_create("kernel.log", "kernel", 1, LOG_LEVEL);
+	logger_obligatorio = log_create("kernel_obligatorio.log", "kernel_obligatorio", 1, LOG_LEVEL);
+
+	config = config_create("/home/utnso/Desktop/TP/tp-2024-2c-LAMBDA/kernel/src/kernel.config");
 	if (config == NULL)
 	{
 		log_error(logger, "No se encontró el archivo :(");
@@ -15,10 +19,6 @@ int main(int argc, char **argv)
 		exit(1);
 	}
 	leer_config();
-
-	// Crear loggers con el nivel de log desde la configuración
-	logger = log_create("kernel.log", "KERNEL", 1, LOG_LEVEL);
-	logger_obligatorio = log_create("kernel_obligatorio.log", "kernel_obligatorio", 1, LOG_LEVEL);
 
 	// Conexión con los módulos: Memoria y CPU (Dispatch e Interrupt)
 	fd_memoria = crear_conexion2(IP_MEMORIA, PUERTO_MEMORIA);

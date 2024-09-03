@@ -13,7 +13,6 @@
 #include <commons/temporal.h>
 #include <commons/temporal.h>
 #include <pthread.h>
-#include <sockets.h>
 
 
 t_log* logger;
