@@ -9,7 +9,7 @@ int main(int argc, char **argv) {
 	logger_obligatorio = log_create("memoria_obligatorio.log", "memoria_obligatorio", 1, LOG_LEVEL);
 	logger = log_create("memoria.log", "memoria", 1, LOG_LEVEL);
 
-	config = config_create("/home/utnso/Desktop/TP/tp-2024-2c-LAMBDA/memoria/src/memoria.config");
+	config = config_create("src/memoria.config");
 	if (config == NULL)
 	{
 		log_error(logger, "No se encontró el archivo :(");

@@ -9,7 +9,7 @@ int main(int argc, char **argv) {
 	logger_obligatorio = log_create("cpu_obligatorio.log", "cpu_obligatorio", 1, LOG_LEVEL);
 	logger = log_create("cpu.log", "cpu", 1, LOG_LEVEL);
 
-	config = config_create("/home/utnso/Desktop/TP/tp-2024-2c-LAMBDA/cpu/src/cpu.config");
+	config = config_create("src/cpu.config");
 	if (config == NULL)
 	{
 		log_error(logger, "No se encontró el archivo :(");

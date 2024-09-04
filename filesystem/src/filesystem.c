@@ -8,7 +8,7 @@ int main(int argc, char **argv) {
     logger_obligatorio = log_create("filesystem_obligatorio.log", "filesystem_obligatorio", 1, LOG_LEVEL);
     logger = log_create("filesystem.log", "filesystem", 1, LOG_LEVEL);
 
-    config = config_create("/home/utnso/Desktop/TP/tp-2024-2c-LAMBDA/filesystem/src/filesystem.config");
+    config = config_create("src/filesystem.config");
     if (config == NULL) {
         log_error(logger, "No se encontró el archivo :(");
         exit(1);
