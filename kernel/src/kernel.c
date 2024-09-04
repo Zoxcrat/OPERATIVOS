@@ -22,9 +22,8 @@ int main(int argc, char **argv)
     leer_config();
 
     // Inicializar proceso con argumentos
-    char *archivo_pseudocodigo = argv[1];
-    int tamanio_proceso = atoi(argv[2]);
-    inicializar_proceso(archivo_pseudocodigo, tamanio_proceso);
+    archivo_pseudocodigo = argv[1];
+    tamanio_proceso = atoi(argv[2]);
 
     // Conexión con CPU (Dispatch e Interrupt)
     fd_cpu_dispatch = crear_conexion2(IP_CPU, PUERTO_CPU_DISPATCH);
@@ -98,13 +97,6 @@ void asignar_algoritmo(char *algoritmo)
     }
 }
 
-void inicializar_proceso(char *archivo_pseudocodigo, int tamanio_proceso)
-{
-    // Inicialización de proceso y primer hilo con prioridad 0
-    TID proceso_inicial = crear_proceso(tamanio_proceso, 0);
-    cargar_pseudocodigo(proceso_inicial, archivo_pseudocodigo);
-}
-
 void planificar_procesos_y_hilos()
 {
     // Lógica para la planificación de procesos y hilos
@@ -117,18 +109,72 @@ void manejar_syscalls()
     // Lógica para manejar llamadas al sistema que simulan entrada/salida
 }
 
-void manejar_conexiones_memoria()
+
+void manejar_cola_new()
 {
-    // Ejemplo de conexión efímera a Memoria
+    while (1)
+    {
+        if (list_size(cola_new) > 0)
+        {
+            // Tomar el primer proceso de la cola NEW
+            PCB* nuevo_proceso = list_remove(cola_new, 0);
+
+            // Intentar inicializar el proceso en memoria
+            if (inicializar_proceso_en_memoria(nuevo_proceso->PID))
+            {
+                // Crear el TID 0 para el proceso
+                TCB* tcb_inicial = malloc(sizeof(TCB));
+                tcb_inicial->TID = 0;
+                tcb_inicial->prioridad = 0; // Puede cambiar la prioridad!!!
+
+                // Añadir el TCB a la lista de TIDs del proceso
+                list_add(nuevo_proceso->TIDs, tcb_inicial);
+
+                // Pasar el proceso al estado READY
+                list_add(lista_ready, nuevo_proceso);
+            }
+            else
+            {
+                // Si no se puede inicializar el proceso, volver a encolarlo en NEW
+                list_add(cola_new, nuevo_proceso);
+            }
+        }
+
+        // Esperar un poco antes de intentar nuevamente (ajustar el tiempo de espera según sea necesario)
+        sleep(1);
+    }
+}
+
+int inicializar_proceso_en_memoria(int PID)
+{
+    // Crear conexión efímera a la memoria
     int fd_memoria = crear_conexion2(IP_MEMORIA, PUERTO_MEMORIA);
     if (fd_memoria == -1)
     {
         log_error(logger_obligatorio, "Fallo la conexión efímera con Memoria");
-        return;
+        return 0; // No se pudo inicializar el proceso
     }
 
-    enviar_mensaje("Solicitud a Memoria", fd_memoria);
+    // Enviar solicitud para inicializar el proceso
+    char mensaje[256];
+    snprintf(mensaje, sizeof(mensaje), "INICIALIZAR_PROCESO %d", PID);
+    enviar_mensaje(mensaje, fd_memoria);
+
+    // Esperar respuesta de la memoria
+    char respuesta[256];
+    recibir_mensaje(respuesta, fd_memoria);
+
     cerrar_conexion(fd_memoria);
+
+    // Verificar si la respuesta indica éxito
+    if (strcmp(respuesta, "OK") == 0)
+    {
+        return 1; // Proceso inicializado exitosamente
+    }
+    else
+    {
+        return 0; // No se pudo inicializar el proceso
+    }
 }
 
 void terminar_programa()
