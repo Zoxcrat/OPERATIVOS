@@ -36,7 +36,7 @@ typedef struct {
 typedef struct {
     int TID;             // Identificador del hilo
     int prioridad;       // Prioridad del hilo
-    estado_proceso estado;       // Prioridad del hilo
+    estado_proceso estado;       // Estado del hilo
 } TCB;
 
 t_log* logger_obligatorio;
@@ -77,9 +77,9 @@ void send_finalizar_proceso(int proceso_id);
 void send_inicializar_hilo(int hilo_id, int prioridad);
 void send_finalizar_hilo(int hilo_id);
 void liberar_PCB(int proceso_id);
-PCB* buscar_proceso_en_cola(t_list* cola,int proceso_id);
+int buscar_proceso_en_cola(t_list* cola,int proceso_id);
 void agregar_a_ready_segun_algoritmo(TCB* nuevo_hilo);
 void mover_a_ready_hilos_bloqueados(int hilo_id);
-void terminar_programa()
+void terminar_programa();
 
 #endif

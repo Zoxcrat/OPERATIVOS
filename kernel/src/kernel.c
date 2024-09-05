@@ -27,10 +27,6 @@ int main(int argc, char **argv)
 
     inicializar_variables();
 
-    // Iniciar el manejo de la cola NEW en un hilo separado
-    pthread_t thread_cola_new;
-    pthread_create(&thread_cola_new, NULL, (void *)manejar_cola_new, NULL);
-
     //conecto con CPU Dispatch y CPU interrupt
     fd_cpu_dispatch = -1, fd_cpu_interrupt = -1;
 	if (!generar_conexiones()) {
@@ -43,18 +39,6 @@ int main(int argc, char **argv)
     enviar_mensaje("Hola CPU interrupt, Soy Kernel!", fd_cpu_interrupt);
     enviar_mensaje("Hola CPU dispatcher, Soy Kernel!", fd_cpu_dispatch);
 
-    // Simulación de ejecución
-    while (1)
-    {
-        // Planificar procesos e hilos
-        planificar_procesos_y_hilos();
-
-        // Simulación de entrada/salida
-        manejar_syscalls();
-
-        // Simulación de solicitudes a Memoria
-        manejar_conexiones_memoria();
-    }
 
     terminar_programa();
     return 0;
@@ -80,7 +64,7 @@ void inicializar_variables(){
     cola_exec= list_create();
     cola_blocked = list_create();
     cola_exit = list_create();
-};
+}
 
 bool generar_conexiones(){
     // Conexión con CPU (Dispatch e Interrupt)
@@ -127,16 +111,15 @@ void conectar_memoria(){
     if (fd_memoria == -1)
     {
         log_error(logger, "Fallo la conexión con Memoria");
-        return 0;
     }
 }
 
 void send_inicializar_proceso(int proceso_id){
     // Crear conexión efimera a la memoria
     conectar_memoria();
-	t_paquete* paquete = crear_paquete(INICIALIZAR_PROCESO);
+	t_paquete* paquete = crear_paquete();
 	agregar_a_paquete(paquete, &proceso_id, sizeof(int));
-	enviar_paquete(paquete, fd_memoria);
+    enviar_peticion(paquete,fd_memoria,INICIALIZAR_PROCESO);
 	eliminar_paquete(paquete);
      // Esperar la respuesta de la memoria
     int respuesta;
@@ -158,9 +141,9 @@ void send_inicializar_proceso(int proceso_id){
 void send_finalizar_proceso(int proceso_id){
     // Crear conexión efimera a la memoria 
     conectar_memoria();
-	t_paquete* paquete = crear_paquete(FINALIZAR_PROCESO);
+	t_paquete* paquete = crear_paquete();
 	agregar_a_paquete(paquete, &proceso_id, sizeof(int));
-	enviar_paquete(paquete, fd_memoria);
+    enviar_peticion(paquete,fd_memoria,FINALIZAR_PROCESO);
 	eliminar_paquete(paquete);
      // Esperar la respuesta de la memoria
     int respuesta;
@@ -169,7 +152,7 @@ void send_finalizar_proceso(int proceso_id){
     
     // Procesar la respuesta de la memoria
     if (respuesta == 1) {
-        log_info(logger, "Proceso %d finalizado correctamente", pid);
+        log_info(logger, "Proceso %d finalizado correctamente", proceso_id);
         liberar_PCB(proceso_id);
 
         // Intentar inicializar un nuevo proceso de la cola NEW
@@ -177,7 +160,7 @@ void send_finalizar_proceso(int proceso_id){
             // Obtener el primer proceso de la cola NEW
             PCB* nuevo_proceso = list_get(cola_new, 0);
             // Enviar solicitud a memoria para inicializar el nuevo proceso
-            send_inicializar_proceso(nuevo_proceso->pid);
+            send_inicializar_proceso(nuevo_proceso->PID);
         }
     } else {
         log_error(logger, "No se pudo finalizar el proceso %d.", proceso_id);
@@ -186,10 +169,10 @@ void send_finalizar_proceso(int proceso_id){
 void send_inicializar_hilo(int hilo_id, int prioridad) {
     // Crear conexión efímera a la memoria
     conectar_memoria();
-    t_paquete* paquete = crear_paquete(INICIALIZAR_HILO);
-    agregar_a_paquete(paquete, &hilo_id, sizeof(int));
-    enviar_paquete(paquete, fd_memoria);
-    eliminar_paquete(paquete);
+	t_paquete* paquete = crear_paquete();
+	agregar_a_paquete(paquete, &hilo_id, sizeof(int));
+    enviar_peticion(paquete,fd_memoria,INICIALIZAR_HILO);
+	eliminar_paquete(paquete);
 
     // Esperar la respuesta de la memoria
     int respuesta; 
@@ -200,11 +183,11 @@ void send_inicializar_hilo(int hilo_id, int prioridad) {
         log_info(logger, "Hilo %d inicializado correctamente", hilo_id);
         // Agregar el hilo a la cola de READY según su prioridad
 
-        TCB* nuevo_hilo;
+        TCB* nuevo_tcb = malloc(sizeof(TCB));
         nuevo_tcb->TID = hilo_id;     
         nuevo_tcb->prioridad = prioridad;
         nuevo_tcb->estado = READY;
-        agregar_a_ready_segun_algoritmo(nuevo_hilo);
+        agregar_a_ready_segun_algoritmo(nuevo_tcb);
     } else {
         log_error(logger, "No se pudo inicializar el hilo %d. Memoria llena", hilo_id);
     }
@@ -214,9 +197,9 @@ void send_inicializar_hilo(int hilo_id, int prioridad) {
 void send_finalizar_hilo(int hilo_id){
     // Crear conexión efimera a la memoria 
     conectar_memoria();
-	t_paquete* paquete = crear_paquete(FINALIZAR_HILO);
+	t_paquete* paquete = crear_paquete();
 	agregar_a_paquete(paquete, &hilo_id, sizeof(int));
-	enviar_paquete(paquete, fd_memoria);
+    enviar_peticion(paquete,fd_memoria,FINALIZAR_HILO);
 	eliminar_paquete(paquete);
      // Esperar la respuesta de la memoria
     int respuesta;
@@ -229,37 +212,37 @@ void send_finalizar_hilo(int hilo_id){
     } else {
         log_error(logger, "No se pudo inicializar el proceso %d. Memoria llena", hilo_id);
     }
-    close(fd_memoria)
+    close(fd_memoria);
 }
 
 void liberar_PCB(int proceso_id) {
     // Buscar el proceso en las colas o listas donde esté registrado y eliminarlo
-    PCB* proceso = buscar_proceso_en_cola(cola_exit,proceso_id);
-    if (proceso != NULL) {
+    int index = buscar_proceso_en_cola(cola_exit,proceso_id);
+    if (index != -1) {
         // Eliminar el proceso de cualquier estructura asociada
-        list_remove(proceso);
+        PCB* proceso=list_get(cola_exit,index);
+        list_remove(cola_exit,index);
         free(proceso);  // Liberar la memoria asociada al PCB
         log_info(logger, "Proceso %d liberado", proceso_id);
     } else {
         log_error(logger, "No se encontró el proceso %d para liberar", proceso_id);
-        list_find(cola, (void*)es_el_proceso);
     }
 }
 
-PCB* buscar_proceso_en_cola(t_list* cola,int proceso_id) {
+int buscar_proceso_en_cola(t_list* cola,int proceso_id) {
     for (int i = 0; i < list_size(cola); i++) {
         PCB* proceso = list_get(cola, i);
         if (proceso->PID == proceso_id) {
-            return proceso;  // Devolver el proceso si coincide
+            return i;  // Devolver el index si coincide
         }
     }
     
-    return NULL;  // Si no se encontró el proceso
+    return -1;  // Si no se encontró el proceso
 }
 
-void agregar_a_ready_segun_algoritmo(TCB* nuevo_hilo) {}
+void agregar_a_ready_segun_algoritmo(TCB* nuevo_hilo) {};
 
-void mover_a_ready_hilos_bloqueados(int hilo_id) {}
+void mover_a_ready_hilos_bloqueados(int hilo_id) {};
 
 void terminar_programa()
 {
