@@ -8,6 +8,10 @@ int main(int argc, char **argv)
         return EXIT_FAILURE;
     }
 
+    // Inicializar proceso con argumentos
+    archivo_pseudocodigo = argv[1];
+    tamanio_proceso = atoi(argv[2]);
+
     // Crear loggers con el nivel de log desde la configuración
     logger = log_create("kernel.log", "kernel", 1, LOG_LEVEL);
     logger_obligatorio = log_create("kernel_obligatorio.log", "kernel_obligatorio", 1, LOG_LEVEL);
@@ -21,27 +25,20 @@ int main(int argc, char **argv)
     }
     leer_config();
 
-    // Inicializar proceso con argumentos
-    archivo_pseudocodigo = argv[1];
-    tamanio_proceso = atoi(argv[2]);
+    inicializar_variables();
 
-    // Conexión con CPU (Dispatch e Interrupt)
-    fd_cpu_dispatch = crear_conexion2(IP_CPU, PUERTO_CPU_DISPATCH);
-    if (fd_cpu_dispatch == -1)
-    {
-        log_error(logger_obligatorio, "Fallo la conexión con CPU dispatch");
-        terminar_programa();
-        exit(1);
-    }
+    // Iniciar el manejo de la cola NEW en un hilo separado
+    pthread_t thread_cola_new;
+    pthread_create(&thread_cola_new, NULL, (void *)manejar_cola_new, NULL);
 
-    fd_cpu_interrupt = crear_conexion2(IP_CPU, PUERTO_CPU_INTERRUPT);
-    if (fd_cpu_interrupt == -1)
-    {
-        log_error(logger_obligatorio, "Fallo la conexión con CPU interrupt");
-        terminar_programa();
-        exit(1);
-    }
-
+    //conecto con CPU Dispatch y CPU interrupt
+    fd_cpu_dispatch = -1, fd_cpu_interrupt = -1;
+	if (!generar_conexiones()) {
+		log_error(logger, "Alguna conexion con el CPU fallo :(");
+		terminar_programa();
+		exit(1);
+	}
+    
     // Mensajes iniciales de saludo a los módulos
     enviar_mensaje("Hola CPU interrupt, Soy Kernel!", fd_cpu_interrupt);
     enviar_mensaje("Hola CPU dispatcher, Soy Kernel!", fd_cpu_dispatch);
@@ -77,6 +74,34 @@ void leer_config()
     LOG_LEVEL = log_level_from_string(log_level);
 }
 
+void inicializar_variables(){
+    cola_new = list_create();
+    cola_ready = list_create();
+    cola_exec= list_create();
+    cola_blocked = list_create();
+    cola_exit = list_create();
+};
+
+bool generar_conexiones(){
+    // Conexión con CPU (Dispatch e Interrupt)
+    pthread_t conexion_cpu_interrupt;
+	pthread_t conexion_cpu_dispatch;
+
+	fd_cpu_interrupt = crear_conexion2(IP_CPU, PUERTO_CPU_INTERRUPT);
+	pthread_create(&conexion_cpu_interrupt, NULL, (void*) procesar_conexion_CPUi, (void*) &fd_cpu_interrupt);
+	pthread_detach(conexion_cpu_interrupt);
+
+	fd_cpu_dispatch = crear_conexion2(IP_CPU, PUERTO_CPU_DISPATCH);
+	pthread_create(&conexion_cpu_dispatch, NULL, (void*) procesar_conexion_CPUd, (void*) &fd_cpu_dispatch);
+	pthread_detach(conexion_cpu_dispatch);
+
+	return fd_cpu_interrupt != -1 && fd_cpu_dispatch != -1;
+}
+
+void procesar_conexion_CPUi(){}
+
+void procesar_conexion_CPUd(){}
+
 void asignar_algoritmo(char *algoritmo)
 {
     if (strcmp(algoritmo, "FIFO") == 0)
@@ -97,89 +122,152 @@ void asignar_algoritmo(char *algoritmo)
     }
 }
 
-void planificar_procesos_y_hilos()
-{
-    // Lógica para la planificación de procesos y hilos
-    // Dependiendo del algoritmo configurado
-    // Enviar procesos a CPU para ser ejecutados
-}
-
-void manejar_syscalls()
-{
-    // Lógica para manejar llamadas al sistema que simulan entrada/salida
-}
-
-
-void manejar_cola_new()
-{
-    while (1)
-    {
-        if (list_size(cola_new) > 0)
-        {
-            // Tomar el primer proceso de la cola NEW
-            PCB* nuevo_proceso = list_remove(cola_new, 0);
-
-            // Intentar inicializar el proceso en memoria
-            if (inicializar_proceso_en_memoria(nuevo_proceso->PID))
-            {
-                // Crear el TID 0 para el proceso
-                TCB* tcb_inicial = malloc(sizeof(TCB));
-                tcb_inicial->TID = 0;
-                tcb_inicial->prioridad = 0; // Puede cambiar la prioridad!!!
-
-                // Añadir el TCB a la lista de TIDs del proceso
-                list_add(nuevo_proceso->TIDs, tcb_inicial);
-
-                // Pasar el proceso al estado READY
-                list_add(lista_ready, nuevo_proceso);
-            }
-            else
-            {
-                // Si no se puede inicializar el proceso, volver a encolarlo en NEW
-                list_add(cola_new, nuevo_proceso);
-            }
-        }
-
-        // Esperar un poco antes de intentar nuevamente (ajustar el tiempo de espera según sea necesario)
-        sleep(1);
-    }
-}
-
-int inicializar_proceso_en_memoria(int PID)
-{
-    // Crear conexión efímera a la memoria
-    int fd_memoria = crear_conexion2(IP_MEMORIA, PUERTO_MEMORIA);
+void conectar_memoria(){
+    fd_memoria = crear_conexion2(IP_MEMORIA, PUERTO_MEMORIA);
     if (fd_memoria == -1)
     {
-        log_error(logger_obligatorio, "Fallo la conexión efímera con Memoria");
-        return 0; // No se pudo inicializar el proceso
-    }
-
-    // Enviar solicitud para inicializar el proceso
-    char mensaje[256];
-    snprintf(mensaje, sizeof(mensaje), "INICIALIZAR_PROCESO %d", PID);
-    enviar_mensaje(mensaje, fd_memoria);
-
-    // Esperar respuesta de la memoria
-    char respuesta[256];
-    recibir_mensaje(respuesta, fd_memoria);
-
-    cerrar_conexion(fd_memoria);
-
-    // Verificar si la respuesta indica éxito
-    if (strcmp(respuesta, "OK") == 0)
-    {
-        return 1; // Proceso inicializado exitosamente
-    }
-    else
-    {
-        return 0; // No se pudo inicializar el proceso
+        log_error(logger, "Fallo la conexión con Memoria");
+        return 0;
     }
 }
+
+void send_inicializar_proceso(int proceso_id){
+    // Crear conexión efimera a la memoria
+    conectar_memoria();
+	t_paquete* paquete = crear_paquete(INICIALIZAR_PROCESO);
+	agregar_a_paquete(paquete, &proceso_id, sizeof(int));
+	enviar_paquete(paquete, fd_memoria);
+	eliminar_paquete(paquete);
+     // Esperar la respuesta de la memoria
+    int respuesta;
+    recv(fd_memoria, &respuesta, sizeof(int), 0);
+    close(fd_memoria);  // Cerrar la conexión con memoria
+    // Procesar la respuesta de la memoria
+    if (respuesta == 1) {
+        log_info(logger, "Proceso %d inicializado correctamente", proceso_id);
+        // Crear el hilo principal (TID 0) del proceso y pasarlo a READY
+        TCB* hilo_principal = malloc(sizeof(TCB));
+        hilo_principal->TID = 0;  // TID 0 para el hilo principal
+        hilo_principal->estado = READY;
+        hilo_principal->prioridad = 0; // a priori para probar, pero deberia variar
+        // Aca pasaria a la cola READY (deberia ajustar su posicion segun su prioridad pero no se sabe cual sera todavia)
+    } else {
+        log_error(logger, "No se pudo inicializar el proceso %d. Memoria llena", proceso_id);
+    }
+}
+void send_finalizar_proceso(int proceso_id){
+    // Crear conexión efimera a la memoria 
+    conectar_memoria();
+	t_paquete* paquete = crear_paquete(FINALIZAR_PROCESO);
+	agregar_a_paquete(paquete, &proceso_id, sizeof(int));
+	enviar_paquete(paquete, fd_memoria);
+	eliminar_paquete(paquete);
+     // Esperar la respuesta de la memoria
+    int respuesta;
+    recv(fd_memoria, &respuesta, sizeof(int), 0);
+    close(fd_memoria);
+    
+    // Procesar la respuesta de la memoria
+    if (respuesta == 1) {
+        log_info(logger, "Proceso %d finalizado correctamente", pid);
+        liberar_PCB(proceso_id);
+
+        // Intentar inicializar un nuevo proceso de la cola NEW
+        if (!list_is_empty(cola_new)) {
+            // Obtener el primer proceso de la cola NEW
+            PCB* nuevo_proceso = list_get(cola_new, 0);
+            // Enviar solicitud a memoria para inicializar el nuevo proceso
+            send_inicializar_proceso(nuevo_proceso->pid);
+        }
+    } else {
+        log_error(logger, "No se pudo finalizar el proceso %d.", proceso_id);
+    }
+}
+void send_inicializar_hilo(int hilo_id, int prioridad) {
+    // Crear conexión efímera a la memoria
+    conectar_memoria();
+    t_paquete* paquete = crear_paquete(INICIALIZAR_HILO);
+    agregar_a_paquete(paquete, &hilo_id, sizeof(int));
+    enviar_paquete(paquete, fd_memoria);
+    eliminar_paquete(paquete);
+
+    // Esperar la respuesta de la memoria
+    int respuesta; 
+    recv(fd_memoria, &respuesta, sizeof(int), 0);
+
+    // Procesar la respuesta de la memoria
+    if (respuesta == 1) {  // Considerar OK como una constante que represente un valor numérico
+        log_info(logger, "Hilo %d inicializado correctamente", hilo_id);
+        // Agregar el hilo a la cola de READY según su prioridad
+
+        TCB* nuevo_hilo;
+        nuevo_tcb->TID = hilo_id;     
+        nuevo_tcb->prioridad = prioridad;
+        nuevo_tcb->estado = READY;
+        agregar_a_ready_segun_algoritmo(nuevo_hilo);
+    } else {
+        log_error(logger, "No se pudo inicializar el hilo %d. Memoria llena", hilo_id);
+    }
+
+    close(fd_memoria);  // Cerrar la conexión con memoria
+}
+void send_finalizar_hilo(int hilo_id){
+    // Crear conexión efimera a la memoria 
+    conectar_memoria();
+	t_paquete* paquete = crear_paquete(FINALIZAR_HILO);
+	agregar_a_paquete(paquete, &hilo_id, sizeof(int));
+	enviar_paquete(paquete, fd_memoria);
+	eliminar_paquete(paquete);
+     // Esperar la respuesta de la memoria
+    int respuesta;
+    recv(fd_memoria, &respuesta, sizeof(int), 0);
+    
+    // Procesar la respuesta de la memoria
+    if (respuesta == 1) {
+        log_info(logger, "Proceso %d inicializado correctamente", hilo_id);
+        mover_a_ready_hilos_bloqueados(hilo_id);
+    } else {
+        log_error(logger, "No se pudo inicializar el proceso %d. Memoria llena", hilo_id);
+    }
+    close(fd_memoria)
+}
+
+void liberar_PCB(int proceso_id) {
+    // Buscar el proceso en las colas o listas donde esté registrado y eliminarlo
+    PCB* proceso = buscar_proceso_en_cola(cola_exit,proceso_id);
+    if (proceso != NULL) {
+        // Eliminar el proceso de cualquier estructura asociada
+        list_remove(proceso);
+        free(proceso);  // Liberar la memoria asociada al PCB
+        log_info(logger, "Proceso %d liberado", proceso_id);
+    } else {
+        log_error(logger, "No se encontró el proceso %d para liberar", proceso_id);
+        list_find(cola, (void*)es_el_proceso);
+    }
+}
+
+PCB* buscar_proceso_en_cola(t_list* cola,int proceso_id) {
+    for (int i = 0; i < list_size(cola); i++) {
+        PCB* proceso = list_get(cola, i);
+        if (proceso->PID == proceso_id) {
+            return proceso;  // Devolver el proceso si coincide
+        }
+    }
+    
+    return NULL;  // Si no se encontró el proceso
+}
+
+void agregar_a_ready_segun_algoritmo(TCB* nuevo_hilo) {}
+
+void mover_a_ready_hilos_bloqueados(int hilo_id) {}
 
 void terminar_programa()
 {
     log_destroy(logger);
     log_destroy(logger_obligatorio);
     config_destroy(config);
+    
+    if (fd_cpu_interrupt != -1) liberar_conexion(fd_cpu_interrupt);
+    if (fd_cpu_dispatch != -1) liberar_conexion(fd_cpu_dispatch);
+    if (fd_memoria != -1) liberar_conexion(fd_memoria);
 }

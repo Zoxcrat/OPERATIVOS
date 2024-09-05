@@ -42,7 +42,6 @@ typedef struct {
 t_log* logger_obligatorio;
 t_log* logger;
 t_config* config;
-
 int fd_memoria;
 int fd_cpu_interrupt;
 int fd_cpu_dispatch;
@@ -59,22 +58,28 @@ int QUANTUM;
 t_log_level LOG_LEVEL;
 
 // Variables PCBs
-int generador_pid;
 t_list* cola_new;
-t_list* lista_ready;
+t_list* cola_ready;
 t_list* cola_exec;
 t_list* cola_blocked;
 t_list* cola_exit;
-
-
+t_list* lista_mutex_bloqueados;
 
 void leer_config();
+void inicializar_variables();
+bool generar_conexiones();
+void procesar_conexion_CPUi();
+void procesar_conexion_CPUd();
 void asignar_algoritmo(char *algoritmo);
-void planificar_procesos_y_hilos();
-void manejar_syscalls();
-void manejar_conexiones_memoria();
-void manejar_cola_new();
-int inicializar_proceso_en_memoria(int PID);
-void terminar_programa();
+void conectar_memoria();
+void send_inicializar_proceso(int proceso_id);
+void send_finalizar_proceso(int proceso_id);
+void send_inicializar_hilo(int hilo_id, int prioridad);
+void send_finalizar_hilo(int hilo_id);
+void liberar_PCB(int proceso_id);
+PCB* buscar_proceso_en_cola(t_list* cola,int proceso_id);
+void agregar_a_ready_segun_algoritmo(TCB* nuevo_hilo);
+void mover_a_ready_hilos_bloqueados(int hilo_id);
+void terminar_programa()
 
 #endif
