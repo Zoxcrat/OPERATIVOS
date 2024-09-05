@@ -20,6 +20,13 @@ typedef enum{
     COLAS_MULTINIVEL
 } t_algoritmo;
 
+typedef enum{
+	NEW,
+	READY,
+	EXEC,
+	BLOCK,
+	EXIT
+} estado_proceso;
 typedef struct {
     int PID;                        // Identificador del proceso
     t_list* TIDs;                   // Lista de TIDs (hilos) asociados al proceso
@@ -31,13 +38,6 @@ typedef struct {
     int prioridad;       // Prioridad del hilo
     estado_proceso estado;       // Prioridad del hilo
 } TCB;
-typedef enum{
-	NEW,
-	READY,
-	EXEC,
-	BLOCK,
-	EXIT
-} estado_proceso;
 
 t_log* logger_obligatorio;
 t_log* logger;
