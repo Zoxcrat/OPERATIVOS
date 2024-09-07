@@ -1,7 +1,7 @@
 #include "./memoria.h"
 
 int main(int argc, char **argv) {
-	if (argc > 2)
+	if (argc > 3)
 	{
 		return EXIT_FAILURE;
 	}
@@ -25,6 +25,13 @@ int main(int argc, char **argv) {
         return EXIT_FAILURE;
     }
 
+    // Conexion con FS
+    fd_filesystem = crear_conexion2(IP_FILESYSTEM, PUERTO_FILESYSTEM);
+        if (fd_filesystem == -1) {
+        log_error(logger, "Error al conectar con el módulo FILESYSEM");
+        return EXIT_FAILURE;
+    }
+
 	// Esperar conexión del módulo CPU
 	int fd_cpu = esperar_cliente(memoria_socket, logger);
     if (fd_cpu == -1) {
@@ -43,7 +50,6 @@ int main(int argc, char **argv) {
         pthread_create(&hilo_cliente, NULL, (void*) procesar_conexion, (void*) (intptr_t) socket_cliente);
         pthread_detach(hilo_cliente);
     }
-
 	terminar_programa();
 	return 0;
 }
