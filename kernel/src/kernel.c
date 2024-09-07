@@ -2,7 +2,7 @@
 
 int main(int argc, char **argv)
 {
-    if (argc < 3)
+    if (argc > 3) // no se por que habias puesto <, pero el programa se quedaba trabado, asi que lo cambie por >. Fijate porque capaz no eniendo el motivo
     {
         printf("Uso: %s [archivo_pseudocodigo] [tamanio_proceso]\n", argv[0]);
         return EXIT_FAILURE;
@@ -34,7 +34,12 @@ int main(int argc, char **argv)
 		terminar_programa();
 		exit(1);
 	}
-    
+    // Conecto con memoria
+    conectar_memoria();
+        if (fd_memoria == -1) {
+        log_error(logger, "Error al conectar con el módulo memoria");
+        return EXIT_FAILURE;
+    }
     // Mensajes iniciales de saludo a los módulos
     enviar_mensaje("Hola CPU interrupt, Soy Kernel!", fd_cpu_interrupt);
     enviar_mensaje("Hola CPU dispatcher, Soy Kernel!", fd_cpu_dispatch);
