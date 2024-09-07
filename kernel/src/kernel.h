@@ -11,8 +11,8 @@
 #include <readline/readline.h>
 #include <string.h>
 #include <commons/temporal.h>
-#include <commons/temporal.h>
 #include <pthread.h>
+#include <semaphore.h>
 
 typedef enum{
 	FIFO,
@@ -24,30 +24,36 @@ typedef enum{
 	NEW,
 	READY,
 	EXEC,
-	BLOCK,
+	BLOCKED,
 	EXIT
-} estado_proceso;
+} estado;
 typedef struct {
     int PID;                        // Identificador del proceso
-    t_list* TIDs;                   // Lista de TIDs (hilos) asociados al proceso
-    t_list* mutex_list;             // Lista de mutex creados para el proceso
+    t_list* TIDs;                   // Lista de IDs de los hilos (TCB) asociados al proceso
+    t_list* mutexs;             // Lista de mutex creados para el proceso
+    int tamanio;              // Tamaño del proceso en memoria
+    int prioridad_hilo_0; // prioridad del hilo principal
+    char *archivo_pseudocodigo_principal; // Nombre del archivo de pseudocódigo
 } PCB;
 
 typedef struct {
     int TID;             // Identificador del hilo
+    int PID;         // PID asociado (proceso padre)
     int prioridad;       // Prioridad del hilo
-    estado_proceso estado;       // Estado del hilo
+    char *archivo_pseudocodigo; // Nombre del archivo de pseudocódigo
+    estado estado;       // Estado del hilo
 } TCB;
 
+
+// Variables
 t_log* logger_obligatorio;
 t_log* logger;
 t_config* config;
 int fd_memoria;
 int fd_cpu_interrupt;
 int fd_cpu_dispatch;
+
 // Variables del config (Las pongo aca asi no estamos revoleando el cfg para todos lados)
-char *archivo_pseudocodigo;
-int tamanio_proceso;
 char* IP_CPU;
 char* PUERTO_CPU_DISPATCH;
 char* PUERTO_CPU_INTERRUPT;
@@ -58,28 +64,42 @@ int QUANTUM;
 t_log_level LOG_LEVEL;
 
 // Variables PCBs
+t_list* procesos_sistema;
 t_list* cola_new;
 t_list* cola_ready;
 t_list* cola_exec;
 t_list* cola_blocked;
 t_list* cola_exit;
-t_list* lista_mutex_bloqueados;
+int pid_global;
 
+// Semaforos
+sem_t verificar_cola_new;
+
+// Hilos
+pthread_t* planificador_largo_plazo;
+pthread_t* planificador_corto_plazo;
+pthread_t* conexion_cpu_dispatch;
+pthread_t* conexion_cpu_interrupt;
+
+// Mutexs
+pthread_mutex_t mutex_cola_ready;
+pthread_mutex_t mutex_colas_multinivel;
+
+// Funciones
 void leer_config();
 void inicializar_variables();
-bool generar_conexiones();
-void procesar_conexion_CPUi();
-void procesar_conexion_CPUd();
 void asignar_algoritmo(char *algoritmo);
+bool generar_conexiones();
+void procesar_conexion_cpu_dispatch();
+void procesar_conexion_cpu_interrupt();
 void conectar_memoria();
-void send_inicializar_proceso(int proceso_id);
-void send_finalizar_proceso(int proceso_id);
-void send_inicializar_hilo(int hilo_id, int prioridad);
-void send_finalizar_hilo(int hilo_id);
-void liberar_PCB(int proceso_id);
-int buscar_proceso_en_cola(t_list* cola,int proceso_id);
-void agregar_a_ready_segun_algoritmo(TCB* nuevo_hilo);
-void mover_a_ready_hilos_bloqueados(int hilo_id);
+void iniciar_hilos();
 void terminar_programa();
+
+
+#include <plani_corto_plazo.h>
+#include <plani_largo_plazo.h>
+#include <procesos_hilos.h>
+
 
 #endif
