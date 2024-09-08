@@ -22,96 +22,85 @@ void lanzar_hilo_plani_corto_plazo_con(void* (*algoritmo_plani)(void*))
     pthread_detach(*planificador_corto_plazo);
 }
 
-void* algoritmo_fifo(void* args)
-{
-    while(1)
-    {
+void* algoritmo_fifo(void* args) {
+    while(1) {
+        sem_wait(&hay_hilos_en_ready);
+
         pthread_mutex_lock(&mutex_cola_ready);
-        if (!list_is_empty(cola_ready)) {
-            TCB* hilo_a_ejecutar = list_remove(cola_ready, 0);
-            pthread_mutex_unlock(&mutex_cola_ready);
-            // Enviar el hilo a la CPU para su ejecución
-            enviar_hilo_a_cpu(hilo_a_ejecutar);
-        } else {
-            pthread_mutex_unlock(&mutex_cola_ready);
-        }
-        sleep(1);
+        TCB* hilo_a_ejecutar = list_remove(cola_ready, 0);
+        pthread_mutex_unlock(&mutex_cola_ready);
+
+        pthread_mutex_lock(&mutex_socket_dispatch);
+        enviar_hilo_a_cpu(hilo_a_ejecutar);
+        pthread_mutex_unlock(&mutex_socket_dispatch);
+
+        pthread_mutex_lock(&mutex_log);
+        log_warning(logger, "Se pasa a EXEC el hilo %d del proceso %d", hilo_a_ejecutar->TID, hilo_a_ejecutar->PID);
+        pthread_mutex_unlock(&mutex_log);
     }
     return NULL;
 }
 
-void* algoritmo_prioridades(void* args)
-{
-    while(1)
-    {
+void* algoritmo_prioridades(void* args) {
+    while(1) {
+        sem_wait(&hay_hilos_en_ready);
+
         pthread_mutex_lock(&mutex_cola_ready);
-
-        if (!list_is_empty(cola_ready)) {
-            TCB* hilo_con_prioridad = list_get(cola_ready, 0);
-            int index_con_prioridad = 0;
-
-            // Buscar el hilo con mayor prioridad, desempate por FIFO
-            for (int i = 1; i < list_size(cola_ready); i++) {
-                TCB* hilo_actual = list_get(cola_ready, i);
-                if (hilo_actual->prioridad < hilo_con_prioridad->prioridad) {
-                    hilo_con_prioridad = hilo_actual;
-                    index_con_prioridad = i;
-                }
+        TCB* hilo_con_prioridad = list_get(cola_ready, 0);
+        int index_con_prioridad = 0;
+        for (int i = 1; i < list_size(cola_ready); i++) {
+            TCB* hilo_actual = list_get(cola_ready, i);
+            if (hilo_actual->prioridad < hilo_con_prioridad->prioridad) {
+                hilo_con_prioridad = hilo_actual;
+                index_con_prioridad = i;
             }
-
-            // Remover el hilo de la cola
-            list_remove(cola_ready, index_con_prioridad);
-
-            pthread_mutex_unlock(&mutex_cola_ready);
-
-            // Ejecutar el hilo con la mayor prioridad
-            enviar_hilo_a_cpu(hilo_con_prioridad);
-        } else {
-            pthread_mutex_unlock(&mutex_cola_ready);
         }
+        list_remove(cola_ready, index_con_prioridad);
+        pthread_mutex_unlock(&mutex_cola_ready);
 
-        sleep(1);
+        pthread_mutex_lock(&mutex_socket_dispatch);
+        enviar_hilo_a_cpu(hilo_con_prioridad);
+        pthread_mutex_unlock(&mutex_socket_dispatch);
+
+        pthread_mutex_lock(&mutex_log);
+        log_warning(logger, "Se pasa a EXEC el hilo %d del proceso %d", hilo_con_prioridad->TID, hilo_con_prioridad->PID);
+        pthread_mutex_unlock(&mutex_log);
     }
     return NULL;
 }
 
-void* algoritmo_colas_multinivel(void* args)
-{
-    while(1)
-    {
+void* algoritmo_colas_multinivel(void* args) {
+    while(1) {
+        sem_wait(&hay_hilos_en_ready);
+
         pthread_mutex_lock(&mutex_colas_multinivel);
+        t_cola_multinivel* cola_mayor_prioridad = obtener_cola_con_mayor_prioridad();
+        TCB* hilo_elegido = list_get(cola_mayor_prioridad->cola, 0);
+        list_remove_element(cola_mayor_prioridad->cola, hilo_elegido);
+        pthread_mutex_unlock(&mutex_colas_multinivel);
 
-        if (!list_is_empty(cola_ready_multinivel)) {
-            t_cola_multinivel* cola_mayor_prioridad = obtener_cola_con_mayor_prioridad();
-            TCB* hilo_elegido = list_get(cola_mayor_prioridad->cola, 0);
-            list_remove_element(cola_mayor_prioridad->cola, hilo_elegido);
+        time_t tiempo_inicio = time(NULL);
 
-            pthread_mutex_unlock(&mutex_colas_multinivel);
+        pthread_mutex_lock(&mutex_socket_dispatch);
+        enviar_hilo_a_cpu(hilo_elegido);
+        pthread_mutex_unlock(&mutex_socket_dispatch);
 
-            // Guardar el tiempo de inicio para el control del quantum
-            time_t tiempo_inicio = time(NULL);
-            enviar_hilo_a_cpu(hilo_elegido);
+        pthread_mutex_lock(&mutex_log);
+        log_warning(logger, "Se pasa a EXEC el hilo %d del proceso %d", hilo_elegido->TID, hilo_elegido->PID);
+        pthread_mutex_unlock(&mutex_log);
 
-            while (hilo_elegido->estado == EXEC) {
-                // Verificar si ha pasado el tiempo del quantum
-                time_t tiempo_actual = time(NULL);
-                double tiempo_transcurrido = difftime(tiempo_actual, tiempo_inicio) * 1000; // Tiempo en milisegundos
-                if (tiempo_transcurrido >= QUANTUM) {
-                    // Enviar una interrupción a la CPU para desalojar el hilo
-                    enviar_interrupcion_a_cpu();
-                    break; // Salir del bucle para permitir el manejo de la interrupción
-                }
-                // Dormir por un corto período para evitar un bucle apretado
-                usleep(1000); // 1 ms
+        while (hilo_elegido->estado == EXEC) {
+            time_t tiempo_actual = time(NULL);
+            double tiempo_transcurrido = difftime(tiempo_actual, tiempo_inicio) * 1000;
+            if (tiempo_transcurrido >= QUANTUM) {
+                enviar_interrupcion_a_cpu();
+                break;
             }
-            // Verificar si el hilo aún no ha terminado
-            if (hilo_elegido->estado == EXEC) {
-                // Mover el hilo a la cola de READY
-                pthread_mutex_lock(&mutex_colas_multinivel);
-                agregar_a_ready(hilo_elegido);
-                pthread_mutex_unlock(&mutex_colas_multinivel);
-            }
-        } else {
+            usleep(1000); // 1 ms
+        }
+        if (hilo_elegido->estado == EXEC) {
+            pthread_mutex_lock(&mutex_colas_multinivel);
+            agregar_a_ready(hilo_elegido);
             pthread_mutex_unlock(&mutex_colas_multinivel);
         }
     }
@@ -129,7 +118,10 @@ void enviar_hilo_a_cpu(TCB* hilo)
 {
     // Cambiar el estado del hilo a EXEC
     hilo->estado = EXEC;
+
+    pthread_mutex_lock(&mutex_hilo_exec);
     hilo_en_exec = hilo;
+    pthread_mutex_lock(&mutex_hilo_exec);
 
     // Crear un paquete para enviar el TID y PID al módulo de CPU (dispatch)
     t_paquete* paquete = crear_paquete();
@@ -144,75 +136,79 @@ void enviar_hilo_a_cpu(TCB* hilo)
     procesar_motivo_devolucion(hilo, motivo);
 }
 
-void procesar_motivo_devolucion(TCB* hilo, motivo_devolucion motivo)
-{
-    switch (motivo)
-    {
-        case MOTIVO_FINALIZACION:
-            // El hilo ha finalizado su ejecución
-            log_info(logger, "Hilo TID %d (PID %d) ha finalizado.", hilo->TID, hilo->PID);
-            hilo->estado = EXIT;
-            free(hilo);  // Liberar los recursos asociados al hilo
-            break;
+void procesar_motivo_devolucion(TCB* hilo, motivo_devolucion motivo) {
+    switch(motivo) {
+        case DESALOJO:
+            pthread_mutex_lock(&mutex_log);
+            log_info(logger, "Volvió el hilo %d del proceso %d por DESALOJO.", hilo->TID, hilo->PID);
+            pthread_mutex_unlock(&mutex_log);
 
-        case MOTIVO_IO:
-            // El hilo necesita realizar una operación de E/S
-            log_info(logger, "Hilo TID %d (PID %d) en espera de I/O.", hilo->TID, hilo->PID);
-            hilo->estado = BLOCKED;
-            // Mover el hilo a la cola de I/O (no mostrado aquí)
-            //mover_a_cola_io(hilo);
-            break;
+            pthread_mutex_lock(&mutex_hilo_exec);
+            agregar_a_ready(hilo_en_exec);
+            hilo_en_exec = NULL;
+            pthread_mutex_unlock(&mutex_hilo_exec);
 
-        case MOTIVO_DESALOJO:
-            // El hilo fue desalojado por una interrupción
-            log_info(logger, "Hilo TID %d (PID %d) fue desalojado.", hilo->TID, hilo->PID);
-            hilo->estado = READY;
-            // Replanificar el hilo, devolviéndolo a la cola READY
-            pthread_mutex_lock(&mutex_cola_ready);
-            list_add(cola_ready, hilo);
-            pthread_mutex_unlock(&mutex_cola_ready);
+            liberar_TCB(hilo);
             break;
+        case BLOQUEO_IO:
+            pthread_mutex_lock(&mutex_log);
+            log_info(logger, "Volvió hilo %d del proceso %d para BLOQUEAR.", hilo->TID, hilo->PID);
+            pthread_mutex_unlock(&mutex_log);
 
-        default:
-            log_error(logger, "Motivo de devolución desconocido: %d", motivo);
+            pthread_mutex_lock(&mutex_hilo_exec);
+            pthread_mutex_lock(&mutex_cola_blocked);
+            list_add(cola_blocked, hilo_en_exec);
+            hilo_en_exec = NULL;
+            pthread_mutex_unlock(&mutex_cola_blocked);
+            pthread_mutex_unlock(&mutex_hilo_exec);
+
+            break;
+        case HILO_TERMINADO:
+            pthread_mutex_lock(&mutex_log);
+            log_info(logger, "Volvió el hilo %d del proceso %d para finalizar.", hilo->TID, hilo->PID);
+            pthread_mutex_unlock(&mutex_log);
+
+            pthread_mutex_lock(&mutex_hilo_exec);
+            hilo_en_exec = NULL;
+            pthread_mutex_unlock(&mutex_hilo_exec);
+
+            liberar_TCB(hilo);
             break;
     }
 }
 
 void agregar_a_ready(TCB* tcb){
     tcb->estado = READY;
-    switch (ALGORITMO_PLANIFICACION)
-    {
-    case FIFO:
-        list_add(cola_ready, tcb);
-        break;
-    case PRIORIDADES:
-        list_add(cola_ready, tcb);
-        break;
-    case COLAS_MULTINIVEL:
-        t_cola_multinivel* cola_multinivel= obtener_o_crear_cola_con_prioridad(tcb->prioridad);
-        list_add(cola_multinivel->cola, tcb);
+    switch (ALGORITMO_PLANIFICACION) {
+        case FIFO:
+            pthread_mutex_lock(&mutex_cola_ready);
+            list_add(cola_ready, tcb);
+            pthread_mutex_unlock(&mutex_cola_ready);
+            break;
+        case PRIORIDADES:
+            pthread_mutex_lock(&mutex_cola_ready);
+            list_add(cola_ready, tcb);
+            pthread_mutex_unlock(&mutex_cola_ready);
+            break;
+        case COLAS_MULTINIVEL:
+            pthread_mutex_lock(&mutex_colas_multinivel);
+            t_cola_multinivel* cola_multinivel = obtener_o_crear_cola_con_prioridad(tcb->prioridad);
+            list_add(cola_multinivel->cola, tcb);
+            pthread_mutex_unlock(&mutex_colas_multinivel);
+            break;
     }
+    sem_post(&hay_hilos_en_ready);
 }
 
 t_cola_multinivel* obtener_o_crear_cola_con_prioridad(int prioridad_buscada) {
-    // Recorrer la lista de colas
     for (int i = 0; i < list_size(cola_ready_multinivel); i++) {
         t_cola_multinivel* cola = list_get(cola_ready_multinivel, i);
-
         if (cola->prioridad == prioridad_buscada) {
-            return cola; // Retornar la cola encontrada
+            pthread_mutex_unlock(&mutex_colas_multinivel);
+            return cola;
         }
     }
-
-    // No se encontró ninguna cola con la prioridad buscada, así que creo una nueva
-    t_cola_multinivel* nueva_cola = malloc(sizeof(t_cola_multinivel));
-    nueva_cola->prioridad = prioridad_buscada;
-    nueva_cola->cola = list_create(); 
-    
-    list_add(cola_ready_multinivel, nueva_cola);
-
-    return nueva_cola;
+    return NULL;
 }
 
 void verificar_eliminacion_cola_multinivel(int prioridad_buscada) {
@@ -232,23 +228,23 @@ void verificar_eliminacion_cola_multinivel(int prioridad_buscada) {
 }
 
 t_cola_multinivel* obtener_cola_con_mayor_prioridad() {
+    pthread_mutex_lock(&mutex_colas_multinivel); // Bloquear el mutex para proteger el acceso a la lista
     // Si la lista de colas multinivel está vacía, devolver NULL
     if (list_is_empty(cola_ready_multinivel)) {
+        pthread_mutex_unlock(&mutex_colas_multinivel); // Desbloquear el mutex antes de devolver
         return NULL;
     }
-
     // Asumir que la primera cola tiene la mayor prioridad inicialmente
     t_cola_multinivel* cola_con_mayor_prioridad = list_get(cola_ready_multinivel, 0);
-
     // Recorrer el resto de las colas y buscar la que tenga la mayor prioridad (valor más bajo)
     for (int i = 1; i < list_size(cola_ready_multinivel); i++) {
         t_cola_multinivel* cola_actual = list_get(cola_ready_multinivel, i);
-        
+
         // Si la prioridad de la cola actual es mayor (valor numérico más bajo), actualizamos
         if (cola_actual->prioridad < cola_con_mayor_prioridad->prioridad) {
             cola_con_mayor_prioridad = cola_actual;
         }
     }
-
+    pthread_mutex_unlock(&mutex_colas_multinivel); // Desbloquear el mutex antes de devolver
     return cola_con_mayor_prioridad;  // Devolver la cola con mayor prioridad
 }

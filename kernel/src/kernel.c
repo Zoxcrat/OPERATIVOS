@@ -130,6 +130,7 @@ void inicializar_estructuras()
 void iniciar_semaforos()
 {
     sem_init(&verificar_cola_new, 0, 0);
+    sem_init(&hay_hilos_en_ready, 0, 0);
 }
 
 void iniciar_mutex()
@@ -137,6 +138,11 @@ void iniciar_mutex()
     pthread_mutex_init(&mutex_cola_ready,NULL);
     pthread_mutex_init(&mutex_colas_multinivel,NULL);
     pthread_mutex_init(&mutex_procesos_en_new,NULL);
+    pthread_mutex_init(&mutex_log,NULL);
+    pthread_mutex_init(&mutex_socket_dispatch,NULL);
+    pthread_mutex_init(&mutex_socket_interrupt,NULL);
+    pthread_mutex_init(&mutex_hilo_exec,NULL);
+    pthread_mutex_init(&mutex_cola_blocked,NULL);
 }
 
 void iniciar_hilos()
@@ -175,11 +181,17 @@ void liberar_mutex()
     pthread_mutex_destroy(&mutex_cola_ready);
     pthread_mutex_destroy(&mutex_colas_multinivel);
     pthread_mutex_destroy(&mutex_procesos_en_new);
+    pthread_mutex_destroy(&mutex_log);
+    pthread_mutex_destroy(&mutex_socket_dispatch);
+    pthread_mutex_destroy(&mutex_socket_interrupt);
+    pthread_mutex_destroy(&mutex_hilo_exec);
+    pthread_mutex_destroy(&mutex_cola_blocked);
 }
 
 void liberar_semaforos()
 {
     sem_destroy(&verificar_cola_new);
+    sem_destroy(&hay_hilos_en_ready);
 }
 
 void liberar_hilos()

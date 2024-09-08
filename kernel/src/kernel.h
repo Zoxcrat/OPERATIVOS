@@ -79,6 +79,7 @@ int pid_global;
 
 // Semaforos
 sem_t verificar_cola_new;
+sem_t hay_hilos_en_ready;
 
 // Hilos
 pthread_t* planificador_largo_plazo;
@@ -89,7 +90,16 @@ pthread_t* conexion_cpu_interrupt;
 // Mutexs
 pthread_mutex_t mutex_cola_ready;
 pthread_mutex_t mutex_colas_multinivel;
+pthread_mutex_t mutex_cola_blocked;
 pthread_mutex_t mutex_procesos_en_new;
+pthread_mutex_t mutex_log;
+pthread_mutex_t mutex_socket_dispatch;
+pthread_mutex_t mutex_socket_interrupt;
+pthread_mutex_t mutex_hilo_exec;
+
+
+
+
 
 // Funciones
 void leer_config();

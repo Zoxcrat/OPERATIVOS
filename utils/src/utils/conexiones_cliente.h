@@ -23,9 +23,9 @@ typedef enum
 
 typedef enum
 {
-	MOTIVO_FINALIZACION,
-	MOTIVO_IO,
-	MOTIVO_DESALOJO
+	DESALOJO,
+	BLOQUEO_IO,
+	HILO_TERMINADO
 }motivo_devolucion;
 
 
