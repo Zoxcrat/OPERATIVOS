@@ -20,6 +20,11 @@ void inicializar_proceso(PCB* proceso){
     int respuesta = informar_inicializacion_proceso_a_memoria(proceso->PID, proceso->tamanio);
     if (respuesta == 1){
         log_info(logger, "Proceso %d inicializado correctamente",proceso->PID);
+        // saca el proceso de la cola new
+        pthread_mutex_lock(&mutex_procesos_en_new);
+        list_remove_element(cola_new, proceso);
+        pthread_mutex_unlock(&mutex_procesos_en_new);
+        //crea el hilo principal
         crear_hilo(proceso, proceso->prioridad_hilo_0, proceso->archivo_pseudocodigo_principal);
     }
     else{
@@ -63,7 +68,7 @@ void finalizar_hilo(int hilo_id, int pid) {
     // Procesar la respuesta de la memoria
     if (respuesta == 1) {
         log_info(logger, "Hilo %d finalizado correctamente del proceso %d finalizado correctamente", hilo_id, pid);
-        TCB* hilo = list_get(cola_exec, 0);
+        hilo_en_exec = NULL;
         free(hilo);
         mover_hilos_bloqueados_por(hilo);
     } else {
@@ -116,12 +121,13 @@ int informar_finalizacion_proceso_a_memoria(int pid){
     return respuesta;
 }
 
-int informar_creacion_hilo_a_memoria(int pid, int tid){
+int informar_creacion_hilo_a_memoria(int pid, int tid, char* archivo_pseudocodigo){
     // Crear conexión efímera a la memoria
     conectar_memoria();
 	t_paquete* paquete = crear_paquete();
 	agregar_a_paquete(paquete, &pid, sizeof(int));
 	agregar_a_paquete(paquete, &tid, sizeof(int));
+	agregar_a_paquete(paquete, archivo_pseudocodigo, strlen(archivo_pseudocodigo) + 1);
     enviar_peticion(paquete,fd_memoria,CREACION_HILO);
 	eliminar_paquete(paquete);
     int respuesta; 

@@ -12,11 +12,22 @@ void* planificar_largo_plazo()
     {
         sem_wait(&verificar_cola_new);
         if (!list_is_empty(cola_new)){
-            PCB* un_proceso = list_get(cola_new, 0);
+            PCB* un_proceso = obtener_proceso_en_new();
             inicializar_proceso(un_proceso);
         } 
         else{
             log_info(logger,"cola new vacia, no se inicializa nada.");
         }
     }
+}
+
+PCB* obtener_proceso_en_new()
+{
+    PCB *un_proceso;
+
+    pthread_mutex_lock(&mutex_procesos_en_new);
+    un_proceso = list_get(cola_new, 0);
+    pthread_mutex_unlock(&mutex_procesos_en_new);
+
+    return un_proceso;
 }

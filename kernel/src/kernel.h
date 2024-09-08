@@ -72,7 +72,7 @@ t_list* procesos_sistema;
 t_list* cola_new;
 t_list* cola_ready;
 t_list* cola_ready_multinivel;
-t_list* cola_exec;
+TCB* hilo_en_exec;
 t_list* cola_blocked;
 t_list* cola_exit;
 int pid_global;
@@ -89,6 +89,7 @@ pthread_t* conexion_cpu_interrupt;
 // Mutexs
 pthread_mutex_t mutex_cola_ready;
 pthread_mutex_t mutex_colas_multinivel;
+pthread_mutex_t mutex_procesos_en_new;
 
 // Funciones
 void leer_config();

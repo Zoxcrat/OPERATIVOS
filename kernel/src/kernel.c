@@ -119,7 +119,6 @@ void inicializar_estructuras()
     cola_new = list_create();
     cola_ready = list_create();
     cola_ready_multinivel = list_create();
-    cola_exec= list_create();
     cola_blocked = list_create();
     cola_exit = list_create();
 
@@ -137,6 +136,7 @@ void iniciar_mutex()
 {
     pthread_mutex_init(&mutex_cola_ready,NULL);
     pthread_mutex_init(&mutex_colas_multinivel,NULL);
+    pthread_mutex_init(&mutex_procesos_en_new,NULL);
 }
 
 void iniciar_hilos()
@@ -154,7 +154,6 @@ void terminar_programa()
     list_destroy(cola_new);
     list_destroy(cola_ready);
     list_destroy(cola_ready_multinivel);
-    list_destroy(cola_exec);
     list_destroy(cola_blocked);
     list_destroy(cola_exit);
 
@@ -175,6 +174,7 @@ void liberar_mutex()
 {
     pthread_mutex_destroy(&mutex_cola_ready);
     pthread_mutex_destroy(&mutex_colas_multinivel);
+    pthread_mutex_destroy(&mutex_procesos_en_new);
 }
 
 void liberar_semaforos()

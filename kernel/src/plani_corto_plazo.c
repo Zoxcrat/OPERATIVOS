@@ -106,7 +106,7 @@ void enviar_hilo_a_cpu(TCB* hilo)
 {
     // Cambiar el estado del hilo a EXEC
     hilo->estado = EXEC;
-    list_add(cola_exec,hilo);
+    hilo_en_exec = hilo;
 
     // Crear un paquete para enviar el TID y PID al módulo de CPU (dispatch)
     t_paquete* paquete = crear_paquete();
@@ -157,6 +157,7 @@ void procesar_motivo_devolucion(TCB* hilo, motivo_devolucion motivo)
 }
 
 void agregar_a_ready(TCB* tcb){
+    tcb->estado = READY;
     switch (ALGORITMO_PLANIFICACION)
     {
     case FIFO:
