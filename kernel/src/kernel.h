@@ -92,14 +92,20 @@ pthread_mutex_t mutex_colas_multinivel;
 
 // Funciones
 void leer_config();
-void inicializar_variables();
+void inicializar_estructuras();
 void asignar_algoritmo(char *algoritmo);
 bool generar_conexiones();
 void procesar_conexion_cpu_dispatch();
 void procesar_conexion_cpu_interrupt();
 void conectar_memoria();
+void inicializar_estructuras();
+void iniciar_semaforos();
+void iniciar_mutex();
 void iniciar_hilos();
 void terminar_programa();
+void liberar_mutex();
+void liberar_semaforos();
+void liberar_hilos();
 
 
 #include <plani_corto_plazo.h>

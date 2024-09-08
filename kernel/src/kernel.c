@@ -25,7 +25,7 @@ int main(int argc, char **argv)
     }
     leer_config();
 
-    inicializar_variables();
+    inicializar_estructuras();
 
     //conecto con CPU Dispatch y CPU interrupt
     fd_cpu_dispatch = -1, fd_cpu_interrupt = -1;
@@ -62,22 +62,6 @@ void leer_config()
     LOG_LEVEL = log_level_from_string(log_level);
 }
 
-void inicializar_variables(){
-    procesos_sistema = list_create();
-    cola_new = list_create();
-    cola_ready = list_create();
-    cola_ready_multinivel = list_create();
-    cola_exec= list_create();
-    cola_blocked = list_create();
-    cola_exit = list_create();
-
-    sem_init(&verificar_cola_new, 0, 0);  // Inicializa el semáforo con valor 0
-
-    iniciar_hilos();
-
-    pid_global = 0;
-}
-
 bool generar_conexiones(){
     // Conexión con CPU (Dispatch e Interrupt)
     pthread_t conexion_cpu_interrupt;
@@ -93,6 +77,12 @@ bool generar_conexiones(){
 
 	return fd_cpu_interrupt != -1 && fd_cpu_dispatch != -1;
 }
+
+void procesar_conexion_cpu_dispatch() {
+    //FALTA IMPLEMENTAR
+}
+
+void procesar_conexion_cpu_interrupt(){}
 
 void asignar_algoritmo(char *algoritmo)
 {
@@ -114,19 +104,39 @@ void asignar_algoritmo(char *algoritmo)
     }
 }
 
-
-void procesar_conexion_cpu_dispatch() {
-    //FALTA IMPLEMENTAR
-}
-
-void procesar_conexion_cpu_interrupt(){}
-
 void conectar_memoria(){
     fd_memoria = crear_conexion2(IP_MEMORIA, PUERTO_MEMORIA);
     if (fd_memoria == -1)
     {
         log_error(logger, "Fallo la conexión con Memoria");
     }
+}
+
+/// INICIALIZAR VARIABLES ///
+void inicializar_estructuras()
+{
+    procesos_sistema = list_create();
+    cola_new = list_create();
+    cola_ready = list_create();
+    cola_ready_multinivel = list_create();
+    cola_exec= list_create();
+    cola_blocked = list_create();
+    cola_exit = list_create();
+
+    iniciar_semaforos();
+    iniciar_mutex();
+    iniciar_hilos();
+}
+
+void iniciar_semaforos()
+{
+    sem_init(&verificar_cola_new, 0, 0);
+}
+
+void iniciar_mutex()
+{
+    pthread_mutex_init(&mutex_cola_ready,NULL);
+    pthread_mutex_init(&mutex_colas_multinivel,NULL);
 }
 
 void iniciar_hilos()
@@ -137,13 +147,45 @@ void iniciar_hilos()
     planificador_largo_plazo = malloc(sizeof(pthread_t));
 }
 
+/// LIBERAR MEMORIA ////
 void terminar_programa()
 {
+    list_destroy(procesos_sistema);
+    list_destroy(cola_new);
+    list_destroy(cola_ready);
+    list_destroy(cola_ready_multinivel);
+    list_destroy(cola_exec);
+    list_destroy(cola_blocked);
+    list_destroy(cola_exit);
+
     log_destroy(logger);
     log_destroy(logger_obligatorio);
     config_destroy(config);
-    
+
+    liberar_semaforos();
+    liberar_mutex();
+    liberar_hilos();
+
     if (fd_cpu_interrupt != -1) liberar_conexion(fd_cpu_interrupt);
     if (fd_cpu_dispatch != -1) liberar_conexion(fd_cpu_dispatch);
     if (fd_memoria != -1) liberar_conexion(fd_memoria);
+}
+
+void liberar_mutex()
+{
+    pthread_mutex_destroy(&mutex_cola_ready);
+    pthread_mutex_destroy(&mutex_colas_multinivel);
+}
+
+void liberar_semaforos()
+{
+    sem_destroy(&verificar_cola_new);
+}
+
+void liberar_hilos()
+{
+    free(planificador_largo_plazo);
+    free(planificador_corto_plazo);
+    free(conexion_cpu_dispatch);
+    free(conexion_cpu_interrupt);
 }

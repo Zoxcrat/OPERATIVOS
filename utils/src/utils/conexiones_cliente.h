@@ -33,7 +33,6 @@ typedef enum
 	SOLICITAR_INSTRUCCION
 }solicitud_cpu;
 
-
 typedef struct
 {
 	int size;
