@@ -1,6 +1,5 @@
 #include "./plani_corto_plazo.h"
 
-
 void inicializar_plani_corto_plazo()
 {
     switch (ALGORITMO_PLANIFICACION)
@@ -80,6 +79,18 @@ void* algoritmo_colas_multinivel(void* args)
 {
     while(1)
     {
+        pthread_mutex_lock(&mutex_colas_multinivel);
+        if (!list_is_empty(cola_ready_multinivel)) {
+            t_cola_multinivel* cola_mayor_prioridad = obtener_cola_con_mayor_prioridad();
+            TCB* hilo_elegido = list_get(cola_mayor_prioridad->cola,0);
+            list_remove_element(cola_mayor_prioridad->cola,hilo_elegido);
+
+            pthread_mutex_unlock(&mutex_cola_ready);
+            // Enviar el hilo a la CPU para su ejecución
+            enviar_hilo_a_cpu(hilo_elegido);
+        } else {
+            pthread_mutex_unlock(&mutex_cola_ready);
+        }
     }
     return NULL;
 }
@@ -95,6 +106,7 @@ void enviar_hilo_a_cpu(TCB* hilo)
 {
     // Cambiar el estado del hilo a EXEC
     hilo->estado = EXEC;
+    list_add(cola_exec,hilo);
 
     // Crear un paquete para enviar el TID y PID al módulo de CPU (dispatch)
     t_paquete* paquete = crear_paquete();
@@ -142,4 +154,77 @@ void procesar_motivo_devolucion(TCB* hilo, motivo_devolucion motivo)
             log_error(logger, "Motivo de devolución desconocido: %d", motivo);
             break;
     }
+}
+
+void agregar_a_ready(TCB* tcb){
+    switch (ALGORITMO_PLANIFICACION)
+    {
+    case FIFO:
+        list_add(cola_ready, tcb);
+        break;
+    case PRIORIDADES:
+        list_add(cola_ready, tcb);
+        break;
+    case COLAS_MULTINIVEL:
+        t_cola_multinivel* cola_multinivel= obtener_o_crear_cola_con_prioridad(tcb->prioridad);
+        list_add(cola_multinivel->cola, tcb);
+    }
+}
+
+t_cola_multinivel* obtener_o_crear_cola_con_prioridad(int prioridad_buscada) {
+    // Recorrer la lista de colas
+    for (int i = 0; i < list_size(cola_ready_multinivel); i++) {
+        t_cola_multinivel* cola = list_get(cola_ready_multinivel, i);
+
+        if (cola->prioridad == prioridad_buscada) {
+            return cola; // Retornar la cola encontrada
+        }
+    }
+
+    // No se encontró ninguna cola con la prioridad buscada, así que creo una nueva
+    t_cola_multinivel* nueva_cola = malloc(sizeof(t_cola_multinivel));
+    nueva_cola->prioridad = prioridad_buscada;
+    nueva_cola->cola = list_create(); 
+    
+    list_add(cola_ready_multinivel, nueva_cola);
+
+    return nueva_cola;
+}
+
+void verificar_eliminacion_cola_multinivel(int prioridad_buscada) {
+    // Recorrer la lista de colas
+    for (int i = 0; i < list_size(cola_ready_multinivel); i++) {
+        t_cola_multinivel* cola = list_get(cola_ready_multinivel, i);
+        if (cola->prioridad == prioridad_buscada) {
+            if (list_is_empty(cola->cola)){
+                // Eliminar la cola de la lista
+                list_remove(cola_ready_multinivel, i);
+                // Liberar la memoria de la cola
+                list_destroy(cola->cola); 
+                free(cola); // Liberar la memoria de la cola
+            }
+        }
+    }
+}
+
+t_cola_multinivel* obtener_cola_con_mayor_prioridad() {
+    // Si la lista de colas multinivel está vacía, devolver NULL
+    if (list_is_empty(cola_ready_multinivel)) {
+        return NULL;
+    }
+
+    // Asumir que la primera cola tiene la mayor prioridad inicialmente
+    t_cola_multinivel* cola_con_mayor_prioridad = list_get(cola_ready_multinivel, 0);
+
+    // Recorrer el resto de las colas y buscar la que tenga la mayor prioridad (valor más bajo)
+    for (int i = 1; i < list_size(cola_ready_multinivel); i++) {
+        t_cola_multinivel* cola_actual = list_get(cola_ready_multinivel, i);
+        
+        // Si la prioridad de la cola actual es mayor (valor numérico más bajo), actualizamos
+        if (cola_actual->prioridad < cola_con_mayor_prioridad->prioridad) {
+            cola_con_mayor_prioridad = cola_actual;
+        }
+    }
+
+    return cola_con_mayor_prioridad;  // Devolver la cola con mayor prioridad
 }

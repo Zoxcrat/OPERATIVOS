@@ -66,6 +66,7 @@ void inicializar_variables(){
     procesos_sistema = list_create();
     cola_new = list_create();
     cola_ready = list_create();
+    cola_ready_multinivel = list_create();
     cola_exec= list_create();
     cola_blocked = list_create();
     cola_exit = list_create();

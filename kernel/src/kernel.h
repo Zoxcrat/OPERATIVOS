@@ -43,7 +43,11 @@ typedef struct {
     char *archivo_pseudocodigo; // Nombre del archivo de pseudocódigo
     estado estado;       // Estado del hilo
 } TCB;
-
+typedef struct {
+    t_list* cola;          // hilos almacenados
+    int prioridad;         // Prioridad de esta cola
+    int quantum_restante;  // Quantum restante para el Round Robin actual
+} t_cola_multinivel;
 
 // Variables
 t_log* logger_obligatorio;
@@ -67,6 +71,7 @@ t_log_level LOG_LEVEL;
 t_list* procesos_sistema;
 t_list* cola_new;
 t_list* cola_ready;
+t_list* cola_ready_multinivel;
 t_list* cola_exec;
 t_list* cola_blocked;
 t_list* cola_exit;

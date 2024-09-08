@@ -82,15 +82,10 @@ void liberar_PCB(t_list* lista_pcbs, int pid) {
     }
 }
 
-
 // FALTAN IMPLEMENTAR
 void mover_hilos_bloqueados_por(TCB* hilo){
     //falta implementar
 }
-void agregar_a_ready(TCB* tcb){
-    //falta implementar, verificaria el algoritmo de corto plazo y varia en la cola en la que se mete (si es fifo o prioridades solo se meta asi nomas)
-}
-
 
 // PEDIDOS A MEMORIA
 
