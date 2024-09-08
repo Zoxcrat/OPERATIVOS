@@ -80,16 +80,39 @@ void* algoritmo_colas_multinivel(void* args)
     while(1)
     {
         pthread_mutex_lock(&mutex_colas_multinivel);
+
         if (!list_is_empty(cola_ready_multinivel)) {
             t_cola_multinivel* cola_mayor_prioridad = obtener_cola_con_mayor_prioridad();
-            TCB* hilo_elegido = list_get(cola_mayor_prioridad->cola,0);
-            list_remove_element(cola_mayor_prioridad->cola,hilo_elegido);
+            TCB* hilo_elegido = list_get(cola_mayor_prioridad->cola, 0);
+            list_remove_element(cola_mayor_prioridad->cola, hilo_elegido);
 
-            pthread_mutex_unlock(&mutex_cola_ready);
-            // Enviar el hilo a la CPU para su ejecución
+            pthread_mutex_unlock(&mutex_colas_multinivel);
+
+            // Guardar el tiempo de inicio para el control del quantum
+            time_t tiempo_inicio = time(NULL);
             enviar_hilo_a_cpu(hilo_elegido);
+
+            while (hilo_elegido->estado == EXEC) {
+                // Verificar si ha pasado el tiempo del quantum
+                time_t tiempo_actual = time(NULL);
+                double tiempo_transcurrido = difftime(tiempo_actual, tiempo_inicio) * 1000; // Tiempo en milisegundos
+                if (tiempo_transcurrido >= QUANTUM) {
+                    // Enviar una interrupción a la CPU para desalojar el hilo
+                    enviar_interrupcion_a_cpu();
+                    break; // Salir del bucle para permitir el manejo de la interrupción
+                }
+                // Dormir por un corto período para evitar un bucle apretado
+                usleep(1000); // 1 ms
+            }
+            // Verificar si el hilo aún no ha terminado
+            if (hilo_elegido->estado == EXEC) {
+                // Mover el hilo a la cola de READY
+                pthread_mutex_lock(&mutex_colas_multinivel);
+                agregar_a_ready(hilo_elegido);
+                pthread_mutex_unlock(&mutex_colas_multinivel);
+            }
         } else {
-            pthread_mutex_unlock(&mutex_cola_ready);
+            pthread_mutex_unlock(&mutex_colas_multinivel);
         }
     }
     return NULL;

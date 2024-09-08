@@ -28,10 +28,6 @@ typedef enum
 	MOTIVO_DESALOJO
 }motivo_devolucion;
 
-typedef enum
-{
-	SOLICITAR_INSTRUCCION
-}solicitud_cpu;
 
 typedef struct
 {

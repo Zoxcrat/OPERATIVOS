@@ -8,6 +8,7 @@
 
 void inicializar_plani_largo_plazo();
 void* planificar_largo_plazo();
+PCB* obtener_proceso_en_new();
 
 ////////////////////////////////////////////
 

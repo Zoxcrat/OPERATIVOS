@@ -36,55 +36,92 @@ void finalizar_proceso(int proceso_id){
     // Crear conexión efimera a la memoria 
     int respuesta = informar_finalizacion_proceso_a_memoria(proceso_id);
 
-    if (respuesta == 1) {
-            log_info(logger, "Proceso %d finalizado correctamente", proceso_id);
-            liberar_PCB(procesos_sistema,proceso_id);
-            sem_post(&verificar_cola_new);
-    }else {
-        log_error(logger, "No se pudo finalizar el proceso %d.", proceso_id);
+    PCB* proceso = buscar_proceso_por_id(proceso_id);
+    if (proceso!=NULL){
+        if (respuesta == 1) {
+                liberar_PCB(proceso);
+                sem_post(&verificar_cola_new);
+                log_info(logger, "Proceso %d finalizado correctamente", proceso_id);
+        }else {
+            log_error(logger, "No se pudo finalizar el proceso %d.", proceso_id);
+        }
+    }
+    else{
+        log_error(logger, "no se pudo encontrar el proceso %d", proceso_id);
     }
 }
 
 void crear_hilo(PCB* proceso, int prioridad, char* archivo_pseudocodigo) {
     // Informar a Memoria
-    int respuesta = informar_creacion_hilo_a_memoria(proceso->PID, list_size(proceso->TIDs));
+    int respuesta = informar_creacion_hilo_a_memoria(proceso->PID, list_size(proceso->TIDs), archivo_pseudocodigo);
     if (respuesta == 1){
         list_add(proceso->TIDs, list_size(proceso->TIDs));
         TCB *nuevo_tcb = malloc(sizeof(TCB));
+        nuevo_tcb->PID = proceso->PID;
         nuevo_tcb->TID = list_size(proceso->TIDs);
         nuevo_tcb->prioridad = prioridad;
-        nuevo_tcb->PID = proceso->PID;
-        log_info(logger, "Hilo %d para el proceso %d creado correctamente",nuevo_tcb->TID, proceso->PID);
-        // Enviar hilo a cola READY
+        nuevo_tcb->archivo_pseudocodigo = archivo_pseudocodigo;
+        nuevo_tcb->estado = READY;
+        // Enviar hilo a cola READY dependiendo del algoritmo de planificacion
         agregar_a_ready(nuevo_tcb);
+        log_info(logger, "Hilo %d para el proceso %d creado correctamente",nuevo_tcb->TID, proceso->PID);
     }
     else{
         log_error(logger, "Hilo %d para el proceso %d no iniciado",list_size(proceso->TIDs), proceso->PID);
     }
 }
 
-void finalizar_hilo(int hilo_id, int pid) {
-    int respuesta = informar_finalizacion_hilo_a_memoria(hilo_id, pid);
+void finalizar_hilo(PCB* proceso,int hilo_id) {
+    int respuesta = informar_finalizacion_hilo_a_memoria(proceso->PID,hilo_id);
     // Procesar la respuesta de la memoria
+    TCB* hilo = buscar_hilo_por_id_y_proceso(proceso,hilo_id);
     if (respuesta == 1) {
-        log_info(logger, "Hilo %d finalizado correctamente del proceso %d finalizado correctamente", hilo_id, pid);
-        hilo_en_exec = NULL;
-        free(hilo);
+        log_info(logger, "Hilo %d finalizado correctamente del proceso %d finalizado correctamente", hilo_id, proceso->PID);
+        liberar_TCB(hilo);
         mover_hilos_bloqueados_por(hilo);
     } else {
         log_error(logger, "No se pudo finalizar el hilo %d", hilo_id);
     }
 }
 
-void liberar_PCB(t_list* lista_pcbs, int pid) {
-    for (int i = 0; i < list_size(lista_pcbs); i++) {
-        PCB* pcb = list_get(lista_pcbs, i);  // Obtén el PCB en la posición i
-        if (pcb->PID == pid) {
-            list_remove(lista_pcbs, i);
-            free(pcb);
-            break;
+void liberar_PCB(PCB* proceso) {
+    // falta implementar, aca buscaria todos los TCBs y los liberaria asociados y luego haria un free al pcb
+
+    list_destroy(proceso->TIDs);
+    list_destroy(proceso->mutexs);
+    free(proceso->archivo_pseudocodigo_principal);
+}
+
+void liberar_TCB(TCB* hilo) {
+    PCB* proceso_asociado = buscar_proceso_por_id(hilo->PID);
+    if (proceso_asociado != NULL) {
+        // Buscar el índice del TID en la lista de TIDs
+        int index_to_remove = -1;
+        for (int i = 0; i < list_size(proceso_asociado->TIDs); i++) {
+            int* tid = (int*) list_get(proceso_asociado->TIDs, i);
+            if (*tid == hilo->TID) {
+                index_to_remove = i;
+                break;
+            }
         }
+        // Si se encontró el TID, removerlo de la lista
+        if (index_to_remove != -1) {
+            int* tid_removido = list_remove(proceso_asociado->TIDs, index_to_remove);
+            free(tid_removido);  // Liberar la memoria del TID removido
+        } else {
+            log_error(logger, "No se encontró el TID %d en el proceso %d", hilo->TID, hilo->PID);
+        }
+    } else {
+        log_error(logger, "No se encontró el proceso con PID %d", hilo->PID);
     }
+    
+    transicionar_hilo_a_exit(hilo);
+}
+
+void transicionar_hilo_a_exit(TCB* hilo)
+{
+    free(hilo->archivo_pseudocodigo);
+    free(hilo);
 }
 
 // FALTAN IMPLEMENTAR
@@ -150,3 +187,18 @@ int informar_finalizacion_hilo_a_memoria(int pid, int tid){
     return respuesta;
 }
 
+/// FUNCIONES AUXILIARES ///
+PCB* buscar_proceso_por_id(int proceso_id) {
+    for (int i = 0; i < list_size(procesos_sistema); i++) {
+        PCB* pcb = (PCB*) list_get(procesos_sistema, i);
+        if (pcb->PID == proceso_id) {
+            return pcb; 
+        }
+    }
+    return NULL; 
+}
+
+
+TCB* buscar_hilo_por_id_y_proceso(PCB* proceso, int hilo_id){
+    //FALTA IMPLEMENTAR
+}
