@@ -111,7 +111,9 @@ void enviar_interrupcion_a_cpu()
 {
     int interrupcion = 1;
     send(fd_cpu_interrupt, &interrupcion, sizeof(int), 0);  // Enviar la interrupción
+    pthread_mutex_lock(&mutex_log);
     log_info(logger, "Se envió una interrupción a la CPU.");
+    pthread_mutex_unlock(&mutex_log);
 }
 
 void enviar_hilo_a_cpu(TCB* hilo)
@@ -199,6 +201,57 @@ void agregar_a_ready(TCB* tcb){
     }
     sem_post(&hay_hilos_en_ready);
 }
+
+void *gestor_io(void) {
+    while (1) {
+        // Esperar a que haya hilos en la cola de BLOCKED (FIFO)
+        sem_wait(&hay_hilos_en_blocked);
+
+        // Esperar hasta que no haya otro hilo en I/O
+        sem_wait(&sem_io_mutex);
+
+        // Obtener el primer hilo en la cola de BLOCKED (FIFO)
+        pthread_mutex_lock(&mutex_cola_blocked);
+        TCB* hilo_bloqueado = list_get(cola_blocked, 0); // Obtener el primer hilo
+        pthread_mutex_unlock(&mutex_cola_blocked);
+
+        // Simular operación de I/O: obtener el tiempo a bloquear
+        int tiempo_a_bloquear = hilo_bloqueado->tiempo_bloqueo_io * 1000; // Convertir a microsegundos
+
+        pthread_mutex_lock(&mutex_log);
+        printf("El hilo %d del proceso %d inicia su I/O de %d milisegundos\n", 
+               hilo_bloqueado->TID, hilo_bloqueado->PID, hilo_bloqueado->tiempo_bloqueo_io);
+        pthread_mutex_unlock(&mutex_log);
+
+        // Simular el bloqueo (I/O) por el tiempo indicado
+        usleep(tiempo_a_bloquear);
+
+        pthread_mutex_lock(&mutex_log);
+        printf("El hilo %d del proceso %d finaliza su I/O de %d milisegundos\n", 
+               hilo_bloqueado->TID, hilo_bloqueado->PID, hilo_bloqueado->tiempo_bloqueo_io);
+        pthread_mutex_unlock(&mutex_log);
+
+        // Remover el hilo de la cola de BLOCKED
+        pthread_mutex_lock(&mutex_cola_blocked);
+        hilo_bloqueado = list_remove(cola_blocked, 0); // Remover el hilo que ya terminó su I/O
+        pthread_mutex_unlock(&mutex_cola_blocked);
+
+        // Mover el hilo a la cola de READY
+        pthread_mutex_lock(&mutex_cola_ready);
+        hilo_bloqueado->estado = READY;
+        agregar_a_ready(hilo_bloqueado);
+        pthread_mutex_unlock(&mutex_cola_ready);
+
+        // Señalar que hay hilos en la cola de READY
+        sem_post(&hay_hilos_en_ready);
+        // Liberar el semáforo de I/O para permitir que el siguiente hilo maneje I/O
+        sem_post(&sem_io_mutex);
+    }
+}
+//manejar este problema: si hay un hilo haciendo i/o que todavia no termina y llegan 2 hilos nuevos a blocked, 
+//ambos hilos habilitaran el semaforo hay_hilos_en_ready (en realidad solo el primero que llegue lo habilitara),
+// pero cuando el segundo hilo que llegue tambien quiera habilitarlo ya va a estar habilitado entonces el while 
+//solo se ejecutara 1 sola vez (la del primer hilo que llego)
 
 t_cola_multinivel* obtener_o_crear_cola_con_prioridad(int prioridad_buscada) {
     for (int i = 0; i < list_size(cola_ready_multinivel); i++) {

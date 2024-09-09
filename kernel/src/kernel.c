@@ -131,6 +131,8 @@ void iniciar_semaforos()
 {
     sem_init(&verificar_cola_new, 0, 0);
     sem_init(&hay_hilos_en_ready, 0, 0);
+    sem_init(&hay_hilos_en_blocked, 0, 0);
+    sem_init(&sem_io_mutex, 0, 1); // Inicializa con 1 para permitir acceso exclusivo
 }
 
 void iniciar_mutex()
@@ -192,6 +194,8 @@ void liberar_semaforos()
 {
     sem_destroy(&verificar_cola_new);
     sem_destroy(&hay_hilos_en_ready);
+    sem_destroy(&hay_hilos_en_blocked);
+    sem_destroy(&sem_io_mutex);
 }
 
 void liberar_hilos()

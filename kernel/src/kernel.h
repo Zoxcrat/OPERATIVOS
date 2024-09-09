@@ -42,6 +42,7 @@ typedef struct {
     int prioridad;       // Prioridad del hilo
     char *archivo_pseudocodigo; // Nombre del archivo de pseudocódigo
     estado estado;       // Estado del hilo
+    int tiempo_bloqueo_io; // Tiempo de bloqueo por operación de I/O (milisegundos)
 } TCB;
 typedef struct {
     t_list* cola;          // hilos almacenados
@@ -80,6 +81,8 @@ int pid_global;
 // Semaforos
 sem_t verificar_cola_new;
 sem_t hay_hilos_en_ready;
+sem_t hay_hilos_en_blocked;
+sem_t sem_io_mutex;
 
 // Hilos
 pthread_t* planificador_largo_plazo;
@@ -96,10 +99,6 @@ pthread_mutex_t mutex_log;
 pthread_mutex_t mutex_socket_dispatch;
 pthread_mutex_t mutex_socket_interrupt;
 pthread_mutex_t mutex_hilo_exec;
-
-
-
-
 
 // Funciones
 void leer_config();

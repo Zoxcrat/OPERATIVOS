@@ -9,8 +9,11 @@ PCB* crear_proceso(char *archivo_pseudocodigo, int tamanio_proceso, int priorida
     nuevo_proceso->tamanio = tamanio_proceso;
     nuevo_proceso->archivo_pseudocodigo_principal = strdup(archivo_pseudocodigo);
     nuevo_proceso->prioridad_hilo_0 = prioridad_hilo_0; // Lista de mutex asociados al proceso
-    log_info(logger, "Proceso %d creado correctamente",nuevo_proceso->PID);
 
+    pthread_mutex_lock(&mutex_log);
+    log_info(logger,"Proceso %d creado correctamente",nuevo_proceso->PID);
+    pthread_mutex_unlock(&mutex_log);
+    
     list_add(cola_new,nuevo_proceso);
     sem_post(&verificar_cola_new);
     return nuevo_proceso;
@@ -19,7 +22,9 @@ PCB* crear_proceso(char *archivo_pseudocodigo, int tamanio_proceso, int priorida
 void inicializar_proceso(PCB* proceso){
     int respuesta = informar_inicializacion_proceso_a_memoria(proceso->PID, proceso->tamanio);
     if (respuesta == 1){
+        pthread_mutex_lock(&mutex_log);
         log_info(logger, "Proceso %d inicializado correctamente",proceso->PID);
+        pthread_mutex_unlock(&mutex_log);
         // saca el proceso de la cola new
         pthread_mutex_lock(&mutex_procesos_en_new);
         list_remove_element(cola_new, proceso);
@@ -28,7 +33,9 @@ void inicializar_proceso(PCB* proceso){
         crear_hilo(proceso, proceso->prioridad_hilo_0, proceso->archivo_pseudocodigo_principal);
     }
     else{
+        pthread_mutex_lock(&mutex_log);
         log_info(logger, "Proceso %d no creado, Memoria llena",proceso->PID);
+        pthread_mutex_unlock(&mutex_log);
     }
 }
 
@@ -41,13 +48,20 @@ void finalizar_proceso(int proceso_id){
         if (respuesta == 1) {
                 liberar_PCB(proceso);
                 sem_post(&verificar_cola_new);
+                
+                pthread_mutex_lock(&mutex_log);
                 log_info(logger, "Proceso %d finalizado correctamente", proceso_id);
+                pthread_mutex_unlock(&mutex_log);
         }else {
+            pthread_mutex_lock(&mutex_log);
             log_error(logger, "No se pudo finalizar el proceso %d.", proceso_id);
+            pthread_mutex_unlock(&mutex_log);
         }
     }
     else{
+        pthread_mutex_lock(&mutex_log);
         log_error(logger, "no se pudo encontrar el proceso %d", proceso_id);
+        pthread_mutex_unlock(&mutex_log);
     }
 }
 
@@ -64,10 +78,17 @@ void crear_hilo(PCB* proceso, int prioridad, char* archivo_pseudocodigo) {
         nuevo_tcb->estado = READY;
         // Enviar hilo a cola READY dependiendo del algoritmo de planificacion
         agregar_a_ready(nuevo_tcb);
+
+        pthread_mutex_lock(&mutex_log);
         log_info(logger, "Hilo %d para el proceso %d creado correctamente",nuevo_tcb->TID, proceso->PID);
+        pthread_mutex_unlock(&mutex_log);
+        
     }
     else{
+        pthread_mutex_lock(&mutex_log);
         log_error(logger, "Hilo %d para el proceso %d no iniciado",list_size(proceso->TIDs), proceso->PID);
+        pthread_mutex_unlock(&mutex_log);
+        
     }
 }
 
@@ -76,11 +97,18 @@ void finalizar_hilo(PCB* proceso,int hilo_id) {
     // Procesar la respuesta de la memoria
     TCB* hilo = buscar_hilo_por_id_y_proceso(proceso,hilo_id);
     if (respuesta == 1) {
-        log_info(logger, "Hilo %d finalizado correctamente del proceso %d finalizado correctamente", hilo_id, proceso->PID);
+        
         liberar_TCB(hilo);
         mover_hilos_bloqueados_por(hilo);
+
+        pthread_mutex_lock(&mutex_log);
+        log_info(logger, "Hilo %d finalizado correctamente del proceso %d finalizado correctamente", hilo_id, proceso->PID);
+        pthread_mutex_unlock(&mutex_log);
     } else {
+        pthread_mutex_lock(&mutex_log);
         log_error(logger, "No se pudo finalizar el hilo %d", hilo_id);
+        pthread_mutex_unlock(&mutex_log);
+        
     }
 }
 
@@ -109,10 +137,16 @@ void liberar_TCB(TCB* hilo) {
             int* tid_removido = list_remove(proceso_asociado->TIDs, index_to_remove);
             free(tid_removido);  // Liberar la memoria del TID removido
         } else {
+
+            pthread_mutex_lock(&mutex_log);
             log_error(logger, "No se encontró el TID %d en el proceso %d", hilo->TID, hilo->PID);
+            pthread_mutex_unlock(&mutex_log);
+            
         }
     } else {
+        pthread_mutex_lock(&mutex_log);
         log_error(logger, "No se encontró el proceso con PID %d", hilo->PID);
+        pthread_mutex_unlock(&mutex_log);
     }
     
     transicionar_hilo_a_exit(hilo);
@@ -197,7 +231,6 @@ PCB* buscar_proceso_por_id(int proceso_id) {
     }
     return NULL; 
 }
-
 
 TCB* buscar_hilo_por_id_y_proceso(PCB* proceso, int hilo_id){
     //FALTA IMPLEMENTAR

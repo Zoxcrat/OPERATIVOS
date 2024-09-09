@@ -14,9 +14,11 @@ void* planificar_largo_plazo()
         if (!list_is_empty(cola_new)){
             PCB* un_proceso = obtener_proceso_en_new();
             inicializar_proceso(un_proceso);
-        } 
+        }
         else{
-            log_info(logger,"cola new vacia, no se inicializa nada.");
+            pthread_mutex_lock(&mutex_log);
+            log_info(logger,"Cola new vacia, no hay procesos para inicializar");
+            pthread_mutex_unlock(&mutex_log);
         }
     }
 }
