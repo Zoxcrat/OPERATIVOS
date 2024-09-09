@@ -33,3 +33,11 @@ PCB* obtener_proceso_en_new()
 
     return un_proceso;
 }
+
+
+void transicionar_hilo_actual_a_exit()
+{
+    free(hilo_en_exec->archivo_pseudocodigo);
+    free(hilo_en_exec);
+    hilo_en_exec = NULL;
+}

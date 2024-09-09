@@ -161,6 +161,8 @@ void procesar_motivo_devolucion(TCB* hilo, motivo_devolucion motivo) {
             pthread_mutex_lock(&mutex_cola_blocked);
             list_add(cola_blocked, hilo_en_exec);
             hilo_en_exec = NULL;
+
+            //falta el gestor IO
             pthread_mutex_unlock(&mutex_cola_blocked);
             pthread_mutex_unlock(&mutex_hilo_exec);
 

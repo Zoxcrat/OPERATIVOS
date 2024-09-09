@@ -82,7 +82,6 @@ void crear_hilo(PCB* proceso, int prioridad, char* archivo_pseudocodigo) {
         pthread_mutex_lock(&mutex_log);
         log_info(logger, "Hilo %d para el proceso %d creado correctamente",nuevo_tcb->TID, proceso->PID);
         pthread_mutex_unlock(&mutex_log);
-        
     }
     else{
         pthread_mutex_lock(&mutex_log);
@@ -104,11 +103,12 @@ void finalizar_hilo(PCB* proceso,int hilo_id) {
         pthread_mutex_lock(&mutex_log);
         log_info(logger, "Hilo %d finalizado correctamente del proceso %d finalizado correctamente", hilo_id, proceso->PID);
         pthread_mutex_unlock(&mutex_log);
+
+        //DESBLOQUEAR HILOS BLOQUEADOS POR THREAD_JOIN / por mutex tomados por el hilo finalizado 
     } else {
         pthread_mutex_lock(&mutex_log);
         log_error(logger, "No se pudo finalizar el hilo %d", hilo_id);
         pthread_mutex_unlock(&mutex_log);
-        
     }
 }
 
@@ -152,11 +152,6 @@ void liberar_TCB(TCB* hilo) {
     transicionar_hilo_a_exit(hilo);
 }
 
-void transicionar_hilo_a_exit(TCB* hilo)
-{
-    free(hilo->archivo_pseudocodigo);
-    free(hilo);
-}
 
 // FALTAN IMPLEMENTAR
 void mover_hilos_bloqueados_por(TCB* hilo){
@@ -235,3 +230,4 @@ PCB* buscar_proceso_por_id(int proceso_id) {
 TCB* buscar_hilo_por_id_y_proceso(PCB* proceso, int hilo_id){
     //FALTA IMPLEMENTAR
 }
+

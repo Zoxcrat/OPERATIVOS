@@ -44,11 +44,19 @@ typedef struct {
     estado estado;       // Estado del hilo
     int tiempo_bloqueo_io; // Tiempo de bloqueo por operación de I/O (milisegundos)
 } TCB;
+
 typedef struct {
     t_list* cola;          // hilos almacenados
     int prioridad;         // Prioridad de esta cola
     int quantum_restante;  // Quantum restante para el Round Robin actual
 } t_cola_multinivel;
+
+typedef struct {
+    t_list* cola;          // hilos almacenados
+    int prioridad;         // Prioridad de esta cola
+    int quantum_restante;  // Quantum restante para el Round Robin actual
+} t_instruccion;
+
 
 // Variables
 t_log* logger_obligatorio;

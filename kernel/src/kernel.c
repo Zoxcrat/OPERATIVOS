@@ -79,8 +79,127 @@ bool generar_conexiones(){
 }
 
 void procesar_conexion_cpu_dispatch() {
-    //FALTA IMPLEMENTAR
+    while (1) {
+        t_syscall codigo_syscall;
+        
+        // Recibir el código de la syscall
+        if (recv(fd_cpu_dispatch, &codigo_syscall, sizeof(t_syscall), MSG_WAITALL) <= 0) {
+            // Error o conexión cerrada
+            close(fd_cpu_dispatch);
+            break;
+        }
+
+        // Procesar la syscall según el código recibido
+        switch (codigo_syscall) {
+            case PROCESS_CREATE: {
+                t_syscall_process_create syscall_data;
+                // Recibir los parámetros específicos de PROCESS_CREATE
+                if (recv(fd_cpu_dispatch, &syscall_data, sizeof(t_syscall_process_create), MSG_WAITALL) > 0) {
+                    // hacer mutex
+                    log_info(logger, "Recibí PROCESS_CREATE");
+
+                    crear_proceso(syscall_data->nombre_archivo, syscall_data->tamano_proceso, syscall_data->prioridad_hilo_0);
+                }
+                break;
+            }
+            case PROCESS_EXIT: {
+                // agregar mutex 
+                log_info(logger, "Recibí PROCESS_EXIT");
+                finalizar_proceso(hilo_en_exec->PID);
+                break;
+            }
+            case THREAD_CREATE: {
+                // Recibir los parámetros específicos de THREAD_CREATE
+                t_syscall_thread_create syscall_data;
+                if (recv(fd_cpu_dispatch, syscall_data, sizeof(t_syscall_thread_create), MSG_WAITALL) > 0) {
+                    // agregar mutex
+                    log_info(logger, "Recibí THREAD_CREATE");
+
+                    PCB* proceso_asociado = buscar_proceso_por_id(hilo_en_exec->PID);
+                    crear_hilo(proceso_asociado, syscall_data->prioridad,syscall_data->nombre_archivo_pseudocodigo);
+                }
+                break;
+            }
+            case THREAD_JOIN: {
+                // Recibir los parámetros específicos de THREAD_CREATE
+                int TID;
+                if (recv(fd_cpu_dispatch, TID, sizeof(int), MSG_WAITALL) > 0) {
+                    // agregar mutex
+                    log_info(logger, "Recibí THREAD_JOIN");
+
+
+                    PCB* proceso_asociado = buscar_proceso_por_id(hilo_en_exec->PID);
+                    TCB* hilo_asociado = buscar_hilo_por_id_y_proceso(proceso_asociado,TID);
+
+                    if (hilo_asociado != NULL){
+                        //agregar mutex en ambas lineas
+                        list_add(cola_blocked, hilo_en_exec);
+                        hilo_en_exec = NULL;
+
+                        sem_post(hay_hilos_en_ready);
+                    }
+                }
+                break;
+            }
+            case THREAD_CANCEL: {
+                // Recibir los parámetros específicos de THREAD_CREATE
+                int TID;
+                if (recv(fd_cpu_dispatch, TID, sizeof(int), MSG_WAITALL) > 0) {
+                    // agregar mutex
+                    log_info(logger, "Recibí THREAD_JOIN");
+                    
+                    
+                    PCB* proceso_asociado = buscar_proceso_por_id(hilo_en_exec->PID);
+                    finalizar_hilo(proceso_asociado, TID);
+                }
+                break;
+            }
+            case THREAD_EXIT: {
+                PCB* proceso_asociado = buscar_proceso_por_id(hilo_en_exec->PID);
+                finalizar_hilo(proceso_asociado, hilo_en_exec->TID);
+                break;
+            }
+            case DUMP_MEMORY: {
+                conectar_memoria();
+                t_paquete* paquete = crear_paquete();
+                agregar_a_paquete(paquete, &hilo_en_exec->TID, sizeof(int));
+                agregar_a_paquete(paquete, &ilo_en_exec->PID, sizeof(int));
+                enviar_peticion(paquete,fd_memoria,HACER_DUMP);
+                eliminar_paquete(paquete);
+
+                int confirmacion;
+                if (recv(fd_cpu_dispatch, confirmacion, sizeof(int), MSG_WAITALL) > 0) {
+                    // agregar mutex
+                    log_info(logger, "Recibí THREAD_JOIN");
+                    
+                    PCB* proceso_asociado = buscar_proceso_por_id(hilo_en_exec->PID);
+                    TCB* hilo_asociado = buscar_hilo_por_id_y_proceso(proceso_asociado, hilo_en_exec->TID);
+                    agregar_a_ready(hilo_asociado);
+                }
+                else{
+                    finalizar_proceso(hilo_en_exec->PID);
+                }
+                break;
+            }
+            case IO: {
+                int cantidad_milisengudos;
+                recv(fd_cpu_dispatch, cantidad_milisengudos, sizeof(int), MSG_WAITALL) > 0;
+                //agregar mutexs en ambas lineas
+                list_add(cola_blocked, hilo_en_exec);
+                hilo_en_exec = NULL;
+                
+                sem_post(&hay_hilos_en_blocked);
+                sem_post(&hay_hilos_en_ready);
+                break;
+            }
+            default: {
+                log_error(logger, "Código de syscall no reconocido");
+                break;
+            }
+        }
+    }
 }
+
 
 void procesar_conexion_cpu_interrupt(){}
 

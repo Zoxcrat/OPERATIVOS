@@ -18,7 +18,8 @@ typedef enum
 	FINALIZACION_PROCESO,
 	CREACION_HILO,
 	FINALIZACION_HILO,
-	ENVIAR_HILO
+	ENVIAR_HILO,
+	HACER_DUMP
 }op_code;
 
 typedef enum
@@ -28,6 +29,33 @@ typedef enum
 	HILO_TERMINADO
 }motivo_devolucion;
 
+typedef enum
+{
+	PROCESS_CREATE,
+	PROCESS_EXIT,
+	THREAD_CREATE,
+	THREAD_JOIN,
+	THREAD_CANCEL,
+	THREAD_EXIT,
+	DUMP_MEMORY,
+	IO
+}t_syscall;
+
+typedef struct {
+    char nombre_archivo[256];
+    int tamano_proceso;
+    int prioridad_hilo_0;
+} t_syscall_process_create;
+
+typedef struct {
+    char* nombre_archivo_pseudocodigo;
+	int prioridad;
+} t_syscall_thread_create;
+
+typedef struct {
+    char* nombre_archivo_pseudocodigo;
+	int prioridad;
+} t_dump_memory;
 
 typedef struct
 {
