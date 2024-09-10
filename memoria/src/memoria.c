@@ -26,10 +26,11 @@ int main(int argc, char **argv)
         log_error(logger, "Error al conectar con el módulo CPU");
         return EXIT_FAILURE;
     }
-    log_info(logger, "Conexión con CPU establecida");
-
-    while (1)
-    {
+    else{
+	log_info(logger, "Conexión con CPU establecida");
+	
+    }
+    while (1) {
         pthread_t hilo_cliente;
         int socket_cliente = esperar_cliente(memoria_socket, logger);
         if (socket_cliente == -1)
