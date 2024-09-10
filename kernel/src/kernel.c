@@ -62,6 +62,26 @@ void leer_config()
     LOG_LEVEL = log_level_from_string(log_level);
 }
 
+void asignar_algoritmo(char *algoritmo)
+{
+    if (strcmp(algoritmo, "FIFO") == 0)
+    {
+        ALGORITMO_PLANIFICACION = FIFO;
+    }
+    else if (strcmp(algoritmo, "PRIORIDADES") == 0)
+    {
+        ALGORITMO_PLANIFICACION = PRIORIDADES;
+    }
+    else if (strcmp(algoritmo, "COLAS MULTINIVEL") == 0)
+    {
+        ALGORITMO_PLANIFICACION = COLAS_MULTINIVEL;
+    }
+    else
+    {
+        log_error(logger, "El algoritmo no es valido");
+    }
+}
+
 bool generar_conexiones(){
     // Conexión con CPU (Dispatch e Interrupt)
     pthread_t conexion_cpu_interrupt;
@@ -84,7 +104,9 @@ void procesar_conexion_cpu_dispatch() {
         
         // Recibir el código de la syscall
         if (recv(fd_cpu_dispatch, &codigo_syscall, sizeof(t_syscall), MSG_WAITALL) <= 0) {
-            // Error o conexión cerrada
+            pthread_mutex_lock(&mutex_log);
+            log_error(logger, "No se pudo recibir la syscall de la CPU");
+            pthread_mutex_unlock(&mutex_log);
             close(fd_cpu_dispatch);
             break;
         }
@@ -92,105 +114,154 @@ void procesar_conexion_cpu_dispatch() {
         // Procesar la syscall según el código recibido
         switch (codigo_syscall) {
             case PROCESS_CREATE: {
-                t_syscall_process_create syscall_data;
+                pthread_mutex_lock(&mutex_log);
+                log_info(logger_obligatorio, "Recibí PROCESS_CREATE");
+                pthread_mutex_unlock(&mutex_log);
+
+                t_syscall_process_create* syscall_data = malloc(sizeof(t_syscall_process_create));
                 // Recibir los parámetros específicos de PROCESS_CREATE
                 if (recv(fd_cpu_dispatch, &syscall_data, sizeof(t_syscall_process_create), MSG_WAITALL) > 0) {
-                    // hacer mutex
-                    log_info(logger, "Recibí PROCESS_CREATE");
-
-                    crear_proceso(syscall_data->nombre_archivo, syscall_data->tamano_proceso, syscall_data->prioridad_hilo_0);
+                    crear_proceso(syscall_data->nombre_archivo_pseudocodigo, syscall_data->tamano_proceso, syscall_data->prioridad_hilo_0);
+                    free(syscall_data->nombre_archivo_pseudocodigo);
+                    free(syscall_data);
                 }
                 break;
             }
             case PROCESS_EXIT: {
-                // agregar mutex 
+                pthread_mutex_lock(&mutex_log);
                 log_info(logger, "Recibí PROCESS_EXIT");
+                pthread_mutex_unlock(&mutex_log);
+                
                 finalizar_proceso(hilo_en_exec->PID);
                 break;
             }
             case THREAD_CREATE: {
                 // Recibir los parámetros específicos de THREAD_CREATE
-                t_syscall_thread_create syscall_data;
-                if (recv(fd_cpu_dispatch, syscall_data, sizeof(t_syscall_thread_create), MSG_WAITALL) > 0) {
-                    // agregar mutex
-                    log_info(logger, "Recibí THREAD_CREATE");
+                pthread_mutex_lock(&mutex_log);
+                log_info(logger, "Recibí THREAD_CREATE");
+                pthread_mutex_unlock(&mutex_log);
 
+                t_syscall_thread_create* syscall_data = malloc(sizeof(t_syscall_thread_create));
+                if (recv(fd_cpu_dispatch, &syscall_data, sizeof(t_syscall_thread_create), MSG_WAITALL) > 0) {
+                    pthread_mutex_lock(&mutex_procesos_sistema);
                     PCB* proceso_asociado = buscar_proceso_por_id(hilo_en_exec->PID);
-                    crear_hilo(proceso_asociado, syscall_data->prioridad,syscall_data->nombre_archivo_pseudocodigo);
+                    pthread_mutex_lock(&mutex_procesos_sistema);
+
+                    crear_hilo(proceso_asociado, syscall_data->prioridad, syscall_data->nombre_archivo_pseudocodigo);
+
+                    free(syscall_data->nombre_archivo_pseudocodigo);
+                    free(syscall_data);
                 }
                 break;
             }
             case THREAD_JOIN: {
-                // Recibir los parámetros específicos de THREAD_CREATE
+                pthread_mutex_lock(&mutex_log);
+                log_info(logger, "Recibí THREAD_JOIN");
+                pthread_mutex_unlock(&mutex_log);
+                
                 int TID;
-                if (recv(fd_cpu_dispatch, TID, sizeof(int), MSG_WAITALL) > 0) {
-                    // agregar mutex
-                    log_info(logger, "Recibí THREAD_JOIN");
-
-
+                if (recv(fd_cpu_dispatch, &TID, sizeof(int), MSG_WAITALL) > 0) {
+                    pthread_mutex_lock(&mutex_procesos_sistema);
                     PCB* proceso_asociado = buscar_proceso_por_id(hilo_en_exec->PID);
-                    TCB* hilo_asociado = buscar_hilo_por_id_y_proceso(proceso_asociado,TID);
+                    pthread_mutex_unlock(&mutex_procesos_sistema);
 
-                    if (hilo_asociado != NULL){
-                        //agregar mutex en ambas lineas
+                    TCB* hilo_asociado = buscar_hilo_por_id_y_proceso(proceso_asociado->PID, TID);
+
+                    if (hilo_asociado != NULL) {
+                        pthread_mutex_lock(&mutex_cola_blocked);
                         list_add(cola_blocked, hilo_en_exec);
-                        hilo_en_exec = NULL;
+                        pthread_mutex_unlock(&mutex_cola_blocked);
 
-                        sem_post(hay_hilos_en_ready);
+                        pthread_mutex_lock(&mutex_hilo_exec);
+                        hilo_en_exec = NULL;
+                        pthread_mutex_unlock(&mutex_hilo_exec);
+
+                        sem_post(&hay_hilos_en_ready);
+
+                        // falta implementar algún mecanismo para reactivar el hilo cuando el indicado termine.
+                    } else {
+                        // Si el hilo con el TID no existe o ya ha terminado, no hacer nada
+                        pthread_mutex_lock(&mutex_log);
+                        log_info(logger, "Hilo con TID %d no existe o ya ha terminado, el hilo que invoca THREAD_JOIN continuará su ejecución", TID);
+                        pthread_mutex_unlock(&mutex_log);
                     }
                 }
                 break;
             }
             case THREAD_CANCEL: {
                 // Recibir los parámetros específicos de THREAD_CREATE
+                pthread_mutex_lock(&mutex_log);
+                log_info(logger, "Recibí THREAD_CANCEL");
+                pthread_mutex_unlock(&mutex_log);
                 int TID;
-                if (recv(fd_cpu_dispatch, TID, sizeof(int), MSG_WAITALL) > 0) {
-                    // agregar mutex
-                    log_info(logger, "Recibí THREAD_JOIN");
-                    
-                    
-                    PCB* proceso_asociado = buscar_proceso_por_id(hilo_en_exec->PID);
-                    finalizar_hilo(proceso_asociado, TID);
+                if (recv(fd_cpu_dispatch, &TID, sizeof(int), MSG_WAITALL) > 0) {
+                    TCB* hilo_requerido = buscar_hilo_por_id_y_proceso(hilo_en_exec->PID, TID);
+
+                    if(hilo_requerido != NULL){
+                        finalizar_hilo(hilo_en_exec->PID, TID);
+                    }
+                    free(hilo_requerido);
                 }
                 break;
             }
             case THREAD_EXIT: {
-                PCB* proceso_asociado = buscar_proceso_por_id(hilo_en_exec->PID);
-                finalizar_hilo(proceso_asociado, hilo_en_exec->TID);
+                finalizar_hilo(hilo_en_exec->PID, hilo_en_exec->TID);
                 break;
             }
             case DUMP_MEMORY: {
+                pthread_mutex_lock(&mutex_log);
+                log_info(logger, "Recibí THREAD_DUMP_MEMORY");
+                pthread_mutex_unlock(&mutex_log);
                 conectar_memoria();
                 t_paquete* paquete = crear_paquete();
                 agregar_a_paquete(paquete, &hilo_en_exec->TID, sizeof(int));
-                agregar_a_paquete(paquete, &ilo_en_exec->PID, sizeof(int));
+                agregar_a_paquete(paquete, &hilo_en_exec->PID, sizeof(int));
                 enviar_peticion(paquete,fd_memoria,HACER_DUMP);
                 eliminar_paquete(paquete);
 
+                pthread_mutex_lock(&mutex_cola_blocked);
+                list_add(cola_blocked, hilo_en_exec);
+                pthread_mutex_unlock(&mutex_cola_blocked);
+                sem_post(&hay_hilos_en_ready);
+
+                TCB* hilo = hilo_en_exec;
+                pthread_mutex_lock(&mutex_hilo_exec);
+                hilo_en_exec = NULL;
+                pthread_mutex_unlock(&mutex_hilo_exec);
+
                 int confirmacion;
-                if (recv(fd_cpu_dispatch, confirmacion, sizeof(int), MSG_WAITALL) > 0) {
-                    // agregar mutex
-                    log_info(logger, "Recibí THREAD_JOIN");
-                    
-                    PCB* proceso_asociado = buscar_proceso_por_id(hilo_en_exec->PID);
-                    TCB* hilo_asociado = buscar_hilo_por_id_y_proceso(proceso_asociado, hilo_en_exec->TID);
-                    agregar_a_ready(hilo_asociado);
+                if (recv(fd_cpu_dispatch, &confirmacion, sizeof(int), MSG_WAITALL) > 0) {
+                    pthread_mutex_lock(&mutex_cola_blocked);
+                    list_remove_element(cola_blocked, hilo);
+                    pthread_mutex_unlock(&mutex_cola_blocked);
+
+                    agregar_a_ready(hilo);
                 }
                 else{
-                    finalizar_proceso(hilo_en_exec->PID);
+                    finalizar_proceso(hilo->PID);
                 }
+                free(hilo);
                 break;
             }
             case IO: {
+                pthread_mutex_lock(&mutex_log);
+                log_info(logger, "Recibí IO");
+                pthread_mutex_unlock(&mutex_log);
+
                 int cantidad_milisengudos;
-                recv(fd_cpu_dispatch, cantidad_milisengudos, sizeof(int), MSG_WAITALL) > 0;
-                //agregar mutexs en ambas lineas
-                list_add(cola_blocked, hilo_en_exec);
-                hilo_en_exec = NULL;
-                
-                sem_post(&hay_hilos_en_blocked);
-                sem_post(&hay_hilos_en_ready);
-                break;
+                if (recv(fd_cpu_dispatch, &cantidad_milisengudos, sizeof(int), MSG_WAITALL) > 0){
+                    pthread_mutex_lock(&mutex_cola_blocked);
+                    list_add(cola_blocked, hilo_en_exec);
+                    pthread_mutex_lock(&mutex_cola_blocked);
+
+                    pthread_mutex_lock(&mutex_hilo_exec);
+                    hilo_en_exec = NULL;
+                    pthread_mutex_lock(&mutex_hilo_exec);
+
+                    sem_post(&hay_hilos_en_blocked);
+                    sem_post(&hay_hilos_en_ready);
+                    break;
+                }
             }
             default: {
                 log_error(logger, "Código de syscall no reconocido");
@@ -200,27 +271,18 @@ void procesar_conexion_cpu_dispatch() {
     }
 }
 
+void procesar_conexion_cpu_interrupt(){
+    while (1){
+        sem_wait(&mandar_interrupcion);
 
-void procesar_conexion_cpu_interrupt(){}
+        int interrupcion = 1;
+        send(fd_cpu_interrupt, &interrupcion, sizeof(int), 0);  // Enviar la interrupción
 
-void asignar_algoritmo(char *algoritmo)
-{
-    if (strcmp(algoritmo, "FIFO") == 0)
-    {
-        ALGORITMO_PLANIFICACION = FIFO;
+        pthread_mutex_lock(&mutex_log);
+        log_info(logger, "Se envió una interrupción a la CPU.");
+        pthread_mutex_unlock(&mutex_log);
     }
-    else if (strcmp(algoritmo, "PRIORIDADES") == 0)
-    {
-        ALGORITMO_PLANIFICACION = PRIORIDADES;
-    }
-    else if (strcmp(algoritmo, "COLAS MULTINIVEL") == 0)
-    {
-        ALGORITMO_PLANIFICACION = COLAS_MULTINIVEL;
-    }
-    else
-    {
-        log_error(logger, "El algoritmo no es valido");
-    }
+    
 }
 
 void conectar_memoria(){
@@ -251,6 +313,7 @@ void iniciar_semaforos()
     sem_init(&verificar_cola_new, 0, 0);
     sem_init(&hay_hilos_en_ready, 0, 0);
     sem_init(&hay_hilos_en_blocked, 0, 0);
+    sem_init(&mandar_interrupcion, 0, 0);
     sem_init(&sem_io_mutex, 0, 1); // Inicializa con 1 para permitir acceso exclusivo
 }
 
@@ -264,6 +327,7 @@ void iniciar_mutex()
     pthread_mutex_init(&mutex_socket_interrupt,NULL);
     pthread_mutex_init(&mutex_hilo_exec,NULL);
     pthread_mutex_init(&mutex_cola_blocked,NULL);
+    pthread_mutex_init(&mutex_procesos_sistema,NULL);
 }
 
 void iniciar_hilos()
@@ -307,6 +371,7 @@ void liberar_mutex()
     pthread_mutex_destroy(&mutex_socket_interrupt);
     pthread_mutex_destroy(&mutex_hilo_exec);
     pthread_mutex_destroy(&mutex_cola_blocked);
+    pthread_mutex_destroy(&mutex_procesos_sistema);
 }
 
 void liberar_semaforos()
@@ -315,6 +380,7 @@ void liberar_semaforos()
     sem_destroy(&hay_hilos_en_ready);
     sem_destroy(&hay_hilos_en_blocked);
     sem_destroy(&sem_io_mutex);
+    sem_destroy(&mandar_interrupcion);
 }
 
 void liberar_hilos()

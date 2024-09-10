@@ -42,7 +42,7 @@ typedef enum
 }t_syscall;
 
 typedef struct {
-    char nombre_archivo[256];
+    char* nombre_archivo_pseudocodigo;
     int tamano_proceso;
     int prioridad_hilo_0;
 } t_syscall_process_create;
@@ -51,11 +51,6 @@ typedef struct {
     char* nombre_archivo_pseudocodigo;
 	int prioridad;
 } t_syscall_thread_create;
-
-typedef struct {
-    char* nombre_archivo_pseudocodigo;
-	int prioridad;
-} t_dump_memory;
 
 typedef struct
 {

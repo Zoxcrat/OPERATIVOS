@@ -107,15 +107,6 @@ void* algoritmo_colas_multinivel(void* args) {
     return NULL;
 }
 
-void enviar_interrupcion_a_cpu()
-{
-    int interrupcion = 1;
-    send(fd_cpu_interrupt, &interrupcion, sizeof(int), 0);  // Enviar la interrupción
-    pthread_mutex_lock(&mutex_log);
-    log_info(logger, "Se envió una interrupción a la CPU.");
-    pthread_mutex_unlock(&mutex_log);
-}
-
 void enviar_hilo_a_cpu(TCB* hilo)
 {
     // Cambiar el estado del hilo a EXEC
@@ -254,6 +245,8 @@ void *gestor_io(void) {
 //ambos hilos habilitaran el semaforo hay_hilos_en_ready (en realidad solo el primero que llegue lo habilitara),
 // pero cuando el segundo hilo que llegue tambien quiera habilitarlo ya va a estar habilitado entonces el while 
 //solo se ejecutara 1 sola vez (la del primer hilo que llego)
+
+/// FUNCIONES PARA ALROGIRMTO COLAS MULTINIVEL
 
 t_cola_multinivel* obtener_o_crear_cola_con_prioridad(int prioridad_buscada) {
     for (int i = 0; i < list_size(cola_ready_multinivel); i++) {

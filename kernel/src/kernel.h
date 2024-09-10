@@ -91,6 +91,7 @@ sem_t verificar_cola_new;
 sem_t hay_hilos_en_ready;
 sem_t hay_hilos_en_blocked;
 sem_t sem_io_mutex;
+sem_t mandar_interrupcion;
 
 // Hilos
 pthread_t* planificador_largo_plazo;
@@ -99,10 +100,11 @@ pthread_t* conexion_cpu_dispatch;
 pthread_t* conexion_cpu_interrupt;
 
 // Mutexs
+pthread_mutex_t mutex_procesos_en_new;
+pthread_mutex_t mutex_procesos_sistema;
 pthread_mutex_t mutex_cola_ready;
 pthread_mutex_t mutex_colas_multinivel;
 pthread_mutex_t mutex_cola_blocked;
-pthread_mutex_t mutex_procesos_en_new;
 pthread_mutex_t mutex_log;
 pthread_mutex_t mutex_socket_dispatch;
 pthread_mutex_t mutex_socket_interrupt;
