@@ -1,6 +1,6 @@
-#include "../include/memoria.h"
+#include "../include/mem_init.h"
 
-void inicializar_memoria()
+int inicializar_memoria()
 {
     // Inicializar logs
     logger_obligatorio = log_create("memoria_obligatorio.log", "memoria_obligatorio", 1, LOG_LEVEL);
@@ -26,6 +26,7 @@ void inicializar_memoria()
         log_error(logger, "Error al iniciar el servidor de la memoria");
         return EXIT_FAILURE;
     }
+    return EXIT_SUCCESS;
 }
 
 void leer_config()

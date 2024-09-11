@@ -1,4 +1,4 @@
-#include "../include/memoria.h"
+#include "../include/mem_gestor.h"
 
 int main(int argc, char **argv)
 {
