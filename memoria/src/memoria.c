@@ -9,6 +9,8 @@ int main(int argc, char **argv)
 
     inicializar_memoria();
 
+    leer_archivo_pseudocodigo("prueba.txt");
+
     // Conexion con FS
     fd_filesystem = crear_conexion2(IP_FILESYSTEM, PUERTO_FILESYSTEM);
     if (fd_filesystem == -1)

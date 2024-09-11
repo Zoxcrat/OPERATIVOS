@@ -3,6 +3,6 @@
 
 #include "mem_gestor.h"
 
-char *leer_archivo_pseudocodigo(char *archivo_a_leer);
+t_list *leer_archivo_pseudocodigo(char *archivo_a_leer);
 
 #endif
