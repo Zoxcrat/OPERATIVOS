@@ -14,34 +14,41 @@
 #include <commons/temporal.h>
 #include <pthread.h>
 
+t_log *logger;
+t_log *logger_obligatorio;
+t_config *config;
 
-t_log* logger;
-t_log* logger_obligatorio;
-t_config* config;
-
-//t_contexto_ejecucion* contexto_de_ejecucion;
+// t_contexto_ejecucion* contexto_de_ejecucion;
 int socket_cliente;
 int memoria_socket;
 int fd_filesystem;
 
 // Variables del config (Las pongo aca asi no estamos revoleando el cfg para todos lados)
 
-char* IP_ESCUCHA;
-char* PUERTO_ESCUCHA;
-char* IP_FILESYSTEM;
-char* PUERTO_FILESYSTEM;
+char *IP_ESCUCHA;
+char *PUERTO_ESCUCHA;
+char *IP_FILESYSTEM;
+char *PUERTO_FILESYSTEM;
 int TAM_MEMORIA;
-char* PATH_INSTRUCCIONES;
+char *PATH_INSTRUCCIONES;
 int RETARDO_RESPUESTA;
-char* ESQUEMA;
-char* ALGORITMO_BUSQUEDA;
-char* PARTICIONES; //REVISAR
+char *ESQUEMA;
+char *ALGORITMO_BUSQUEDA;
+char *PARTICIONES; // REVISAR
 t_log_level LOG_LEVEL;
+
+// Variables de memoria
+void *memoria_usuario;
+t_list *lista_particiones;
 
 // INIT
 void leer_config();
-void* procesar_conexion(void* arg);
-void* procesar_peticion(void* arg);
+void *procesar_conexion(void *arg);
+void *procesar_peticion(void *arg);
 void terminar_programa();
+/**
+ * Inicializa los logs, configs y crea el espacio de memoria.
+ */
+void inicializar_memoria();
 
 #endif
