@@ -7,7 +7,7 @@ void crear_proceso(char *archivo_pseudocodigo, int tamanio_proceso, int priorida
     nuevo_proceso->TIDs = list_create();  
     nuevo_proceso->mutexs = list_create(); 
     nuevo_proceso->tamanio = tamanio_proceso;
-    nuevo_proceso->archivo_pseudocodigo_principal = strdup(archivo_pseudocodigo);
+    nuevo_proceso->archivo_pseudocodigo_principal = archivo_pseudocodigo;
     nuevo_proceso->prioridad_hilo_0 = prioridad_hilo_0; // lo pongo en el pcb por si todavia no se puede inicializar el proceso en memoria
 
     pthread_mutex_lock(&mutex_log);
@@ -17,8 +17,9 @@ void crear_proceso(char *archivo_pseudocodigo, int tamanio_proceso, int priorida
     pthread_mutex_lock(&mutex_procesos_en_new);
     list_add(cola_new,nuevo_proceso);
     pthread_mutex_unlock(&mutex_procesos_en_new);
-
+    
     sem_post(&verificar_cola_new);
+    printf(sem_getvalue(&verificar_cola_new,NULL));
 }
 
 void inicializar_proceso(PCB* proceso){
@@ -37,6 +38,8 @@ void inicializar_proceso(PCB* proceso){
         pthread_mutex_unlock(&mutex_procesos_en_new);
         //crea el hilo principal
         crear_hilo(proceso, proceso->prioridad_hilo_0, proceso->archivo_pseudocodigo_principal);
+
+        free(proceso->archivo_pseudocodigo_principal);
     }
     else{
         pthread_mutex_lock(&mutex_log);
@@ -95,8 +98,6 @@ void crear_hilo(PCB* proceso, int prioridad, char* archivo_pseudocodigo) {
         pthread_mutex_lock(&mutex_log);
         log_info(logger, "Hilo %d para el proceso %d creado correctamente",nuevo_tcb->TID, proceso->PID);
         pthread_mutex_unlock(&mutex_log);
-
-        free(proceso->archivo_pseudocodigo_principal);
     }
     else{
         pthread_mutex_lock(&mutex_log);
@@ -172,7 +173,6 @@ void transicionar_hilo_actual_a_exit()
 void mover_hilos_bloqueados_por(TCB* hilo){
     //falta implementar
 }
-
 // PEDIDOS A MEMORIA
 
 int informar_inicializacion_proceso_a_memoria(int pid, int tamanio){
@@ -244,7 +244,6 @@ PCB* buscar_proceso_por_id(int proceso_id) {
 
 TCB* buscar_hilo_por_id_y_proceso(int proceso_id, int hilo_id) {
     TCB* hilo_encontrado = NULL;
-
     // Verificar en la cola de ready (si no es multinivel)
     if (ALGORITMO_PLANIFICACION != COLAS_MULTINIVEL) {
         pthread_mutex_lock(&mutex_cola_ready);
@@ -272,7 +271,6 @@ TCB* buscar_hilo_por_id_y_proceso(int proceso_id, int hilo_id) {
         }
         pthread_mutex_unlock(&mutex_colas_multinivel);
     }
-
     // Si no lo encontró en ready, buscar en blocked
     if (hilo_encontrado == NULL) {
         pthread_mutex_lock(&mutex_cola_blocked);
@@ -290,7 +288,7 @@ TCB* buscar_hilo_por_id_y_proceso(int proceso_id, int hilo_id) {
 }
 
 int obtener_numero_proximo_hilo(PCB* proceso) {
-    int proximo_hilo = 0;
+    int proximo_hilo = -1;
 
     for (int i = 0; i < list_size(proceso->TIDs); i++) {
         int tid_actual = list_get(proceso->TIDs, i);

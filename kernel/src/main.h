@@ -1,5 +1,5 @@
-#ifndef KERNEL_H_
-#define KERNEL_H_
+#ifndef MAIN_H_
+#define MAIN_H_
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -51,74 +51,72 @@ typedef struct {
     int quantum_restante;  // Quantum restante para el Round Robin actual
 } t_cola_multinivel;
 
-typedef struct {
-    t_list* cola;          // hilos almacenados
-    int prioridad;         // Prioridad de esta cola
-    int quantum_restante;  // Quantum restante para el Round Robin actual
-} t_instruccion;
-
-
-// Variables
-t_log* logger_obligatorio;
-t_log* logger;
-t_config* config;
-int fd_memoria;
-int fd_cpu_interrupt;
-int fd_cpu_dispatch;
+// Variables config
+extern t_log* logger_obligatorio;
+extern t_log* logger;
+extern t_config* config;
+extern int fd_memoria;
+extern int fd_cpu_interrupt;
+extern int fd_cpu_dispatch;
 
 // Variables del config (Las pongo aca asi no estamos revoleando el cfg para todos lados)
-char* IP_CPU;
-char* PUERTO_CPU_DISPATCH;
-char* PUERTO_CPU_INTERRUPT;
-char* IP_MEMORIA;
-char* PUERTO_MEMORIA;
-t_algoritmo ALGORITMO_PLANIFICACION;
-int QUANTUM;
-t_log_level LOG_LEVEL;
+extern char* IP_CPU;
+extern char* PUERTO_CPU_DISPATCH;
+extern char* PUERTO_CPU_INTERRUPT;
+extern char* IP_MEMORIA;
+extern char* PUERTO_MEMORIA;
+extern t_algoritmo ALGORITMO_PLANIFICACION;
+extern int QUANTUM;
+extern t_log_level LOG_LEVEL;
 
 // Variables PCBs
-t_list* procesos_sistema;
-t_list* cola_new;
-t_list* cola_ready;
-t_list* cola_ready_multinivel;
-TCB* hilo_en_exec;
-t_list* cola_blocked;
-t_list* cola_exit;
-int pid_global;
+extern int pid_global;
+extern t_list* procesos_sistema;
+extern t_list* cola_new;
+extern t_list* cola_ready;
+extern t_list* cola_ready_multinivel;
+extern t_list* cola_blocked;
+extern t_list* cola_io;
+extern bool io_en_uso;// Estado que indica si el I/O está en uso
+extern t_list* cola_exit;
+extern TCB* hilo_en_exec;
+extern int tiempo_a_bloquear;
 
 // Semaforos
-sem_t verificar_cola_new;
-sem_t hay_hilos_en_ready;
-sem_t hay_hilos_en_blocked;
-sem_t sem_io_mutex;
-sem_t mandar_interrupcion;
+extern sem_t verificar_cola_new;
+extern sem_t hay_hilos_en_ready;
+extern sem_t hay_hilos_en_blocked;
+extern sem_t sem_io_mutex;
+extern sem_t mandar_interrupcion;
+extern sem_t hay_hilos_en_io;
 
 // Hilos
-pthread_t* planificador_largo_plazo;
-pthread_t* planificador_corto_plazo;
-pthread_t* conexion_cpu_dispatch;
-pthread_t* conexion_cpu_interrupt;
+extern pthread_t* planificador_largo_plazo;
+extern pthread_t* planificador_corto_plazo;
+extern pthread_t* hilo_gestor_io;
+extern pthread_t* conexion_cpu_dispatch;
+extern pthread_t* conexion_cpu_interrupt;
 
 // Mutexs
-pthread_mutex_t mutex_procesos_en_new;
-pthread_mutex_t mutex_procesos_sistema;
-pthread_mutex_t mutex_cola_ready;
-pthread_mutex_t mutex_colas_multinivel;
-pthread_mutex_t mutex_cola_blocked;
-pthread_mutex_t mutex_log;
-pthread_mutex_t mutex_socket_dispatch;
-pthread_mutex_t mutex_socket_interrupt;
-pthread_mutex_t mutex_hilo_exec;
+extern pthread_mutex_t mutex_procesos_en_new;
+extern pthread_mutex_t mutex_procesos_sistema;
+extern pthread_mutex_t mutex_cola_ready;
+extern pthread_mutex_t mutex_colas_multinivel;
+extern pthread_mutex_t mutex_cola_blocked;
+extern pthread_mutex_t mutex_cola_io;
+extern pthread_mutex_t mutex_log;
+extern pthread_mutex_t mutex_socket_dispatch;
+extern pthread_mutex_t mutex_socket_interrupt;
+extern pthread_mutex_t mutex_hilo_exec;
 
 // Funciones
 void leer_config();
-void inicializar_estructuras();
 void asignar_algoritmo(char *algoritmo);
 bool generar_conexiones();
 void procesar_conexion_cpu_dispatch();
 void procesar_conexion_cpu_interrupt();
-void conectar_memoria();
 void inicializar_estructuras();
+void conectar_memoria();
 void iniciar_semaforos();
 void iniciar_mutex();
 void iniciar_hilos();
@@ -127,10 +125,9 @@ void liberar_mutex();
 void liberar_semaforos();
 void liberar_hilos();
 
-
 #include <plani_corto_plazo.h>
 #include <plani_largo_plazo.h>
 #include <procesos_hilos.h>
-
+#include <gestor_io.h>
 
 #endif

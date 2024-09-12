@@ -1,8 +1,7 @@
 #ifndef KERNEL_PROCESOS_HILOS_H
 #define KERNEL_PROCESOS_HILOS_H
 
-#include "kernel.h"
-#include "plani_corto_plazo.h"
+#include "./main.h"
 
 void crear_proceso(char *archivo_pseudocodigo, int tamanio_proceso, int prioridad_hilo_0);
 void inicializar_proceso(PCB* proceso);

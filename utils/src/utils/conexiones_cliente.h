@@ -24,13 +24,6 @@ typedef enum
 
 typedef enum
 {
-	DESALOJO,
-	BLOQUEO_IO,
-	HILO_TERMINADO
-}motivo_devolucion;
-
-typedef enum
-{
 	PROCESS_CREATE,
 	PROCESS_EXIT,
 	THREAD_CREATE,

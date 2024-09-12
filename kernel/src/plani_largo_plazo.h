@@ -1,8 +1,7 @@
 #ifndef KERNEL_PLANI_LARGO_PLAZO_H
 #define KERNEL_PLANI_LARGO_PLAZO_H
 
-#include "kernel.h"
-#include "procesos_hilos.h"
+#include "./main.h"
 
 ////////////////////////////////////////////
 

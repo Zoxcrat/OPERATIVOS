@@ -12,6 +12,7 @@ void* planificar_largo_plazo()
     {
         sem_wait(&verificar_cola_new);
         if (!list_is_empty(cola_new)){
+            log_info(logger, "pase el semaforo");
             PCB* un_proceso = obtener_proceso_en_new();
             inicializar_proceso(un_proceso);
         }
