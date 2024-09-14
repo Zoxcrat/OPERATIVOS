@@ -51,6 +51,13 @@ typedef struct {
     int quantum_restante;  // Quantum restante para el Round Robin actual
 } t_cola_multinivel;
 
+typedef struct {
+    int pid;           // PID del proceso (el mismo para el hilo esperador y el esperado)
+    int tid_esperador; // TID del hilo que espera
+    int tid_esperado;  // TID del hilo esperado
+} t_join_wait;
+
+
 // Variables config
 extern t_log* logger_obligatorio;
 extern t_log* logger;
@@ -77,10 +84,12 @@ extern t_list* cola_ready;
 extern t_list* cola_ready_multinivel;
 extern t_list* cola_blocked;
 extern t_list* cola_io;
+extern t_list* lista_joins; 
 extern bool io_en_uso;// Estado que indica si el I/O está en uso
 extern t_list* cola_exit;
 extern TCB* hilo_en_exec;
 extern int tiempo_a_bloquear;
+extern int pid_a_buscar; 
 
 // Semaforos
 extern sem_t verificar_cola_new;
@@ -108,6 +117,7 @@ extern pthread_mutex_t mutex_log;
 extern pthread_mutex_t mutex_socket_dispatch;
 extern pthread_mutex_t mutex_socket_interrupt;
 extern pthread_mutex_t mutex_hilo_exec;
+extern pthread_mutex_t mutex_cola_join_wait;
 
 // Funciones
 void leer_config();

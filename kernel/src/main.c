@@ -27,9 +27,11 @@ t_list* cola_ready_multinivel;
 t_list* cola_blocked;
 bool io_en_uso; // Estado que indica si el I/O está en uso
 t_list* cola_io;
+t_list* lista_joins;
 t_list* cola_exit;
 TCB* hilo_en_exec;
 int tiempo_a_bloquear;
+int pid_a_buscar;
 
 // Semaforos
 sem_t verificar_cola_new;
@@ -57,6 +59,7 @@ pthread_mutex_t mutex_log;
 pthread_mutex_t mutex_socket_dispatch;
 pthread_mutex_t mutex_socket_interrupt;
 pthread_mutex_t mutex_hilo_exec;
+pthread_mutex_t mutex_cola_join_wait;
 
 int main(int argc, char **argv)
 {
@@ -202,7 +205,7 @@ void procesar_conexion_cpu_dispatch() {
                 t_syscall_thread_create* syscall_data = malloc(sizeof(t_syscall_thread_create));
                 if (recv(fd_cpu_dispatch, &syscall_data, sizeof(t_syscall_thread_create), MSG_WAITALL) > 0) {
                     pthread_mutex_lock(&mutex_procesos_sistema);
-                    PCB* proceso_asociado = buscar_proceso_por_id(hilo_en_exec->PID);
+                    PCB* proceso_asociado = obtener_proceso_por_pid(hilo_en_exec->PID);
                     pthread_mutex_lock(&mutex_procesos_sistema);
 
                     crear_hilo(proceso_asociado, syscall_data->prioridad, syscall_data->nombre_archivo_pseudocodigo);
@@ -216,31 +219,22 @@ void procesar_conexion_cpu_dispatch() {
                 pthread_mutex_lock(&mutex_log);
                 log_info(logger, "Recibí THREAD_JOIN");
                 pthread_mutex_unlock(&mutex_log);
-                
+
                 int TID;
                 if (recv(fd_cpu_dispatch, &TID, sizeof(int), MSG_WAITALL) > 0) {
                     pthread_mutex_lock(&mutex_procesos_sistema);
-                    PCB* proceso_asociado = buscar_proceso_por_id(hilo_en_exec->PID);
+                    PCB* proceso_asociado = obtener_proceso_por_pid(hilo_en_exec->PID);
                     pthread_mutex_unlock(&mutex_procesos_sistema);
 
-                    TCB* hilo_asociado = buscar_hilo_por_id_y_proceso(proceso_asociado->PID, TID);
+                    TCB* hilo_asociado = buscar_hilo_por_pid_tid(proceso_asociado->PID, TID);
 
                     if (hilo_asociado != NULL) {
-                        pthread_mutex_lock(&mutex_cola_blocked);
-                        list_add(cola_blocked, hilo_en_exec);
-                        pthread_mutex_unlock(&mutex_cola_blocked);
-
-                        pthread_mutex_lock(&mutex_hilo_exec);
-                        hilo_en_exec = NULL;
-                        pthread_mutex_unlock(&mutex_hilo_exec);
-
+                        manejar_thread_join(TID);
                         sem_post(&hay_hilos_en_ready);
-
-                        // falta implementar algún mecanismo para reactivar el hilo cuando el indicado termine.
                     } else {
                         // Si el hilo con el TID no existe o ya ha terminado, no hacer nada
                         pthread_mutex_lock(&mutex_log);
-                        log_info(logger, "Hilo con TID %d no existe o ya ha terminado, el hilo que invoca THREAD_JOIN continuará su ejecución", TID);
+                        log_info(logger, "Hilo %d del proceso %d no existe o ya ha terminado, el hilo que invoca THREAD_JOIN continuará su ejecución",TID,proceso_asociado->PID);
                         pthread_mutex_unlock(&mutex_log);
                     }
                 }
@@ -253,17 +247,28 @@ void procesar_conexion_cpu_dispatch() {
                 pthread_mutex_unlock(&mutex_log);
                 int TID;
                 if (recv(fd_cpu_dispatch, &TID, sizeof(int), MSG_WAITALL) > 0) {
-                    TCB* hilo_requerido = buscar_hilo_por_id_y_proceso(hilo_en_exec->PID, TID);
+                    TCB* hilo_requerido = buscar_hilo_por_pid_tid(hilo_en_exec->PID, TID);
 
                     if(hilo_requerido != NULL){
                         finalizar_hilo(hilo_en_exec->PID, TID);
                     }
-                    free(hilo_requerido);
                 }
                 break;
             }
             case THREAD_EXIT: {
                 finalizar_hilo(hilo_en_exec->PID, hilo_en_exec->TID);
+                break;
+            }
+            case MUTEX_CREATE: {
+                // FALTA IMPLEMENTAR
+                break;
+            }
+            case MUTEX_LOCK: {
+                // FALTA IMPLEMENTAR
+                break;
+            }
+            case MUTEX_UNLOCK: {
+                // FALTA IMPLEMENTAR
                 break;
             }
             case DUMP_MEMORY: {
@@ -306,7 +311,7 @@ void procesar_conexion_cpu_dispatch() {
                 if (recv(fd_cpu_dispatch, &tiempo_IO_milisegundos, sizeof(int), MSG_WAITALL) > 0){
                     tiempo_a_bloquear = tiempo_IO_milisegundos;
                     sem_post(&hay_hilos_en_io);
-                } 
+                }
             }
             default: {
                 log_error(logger, "Código de syscall no reconocido");
@@ -374,6 +379,7 @@ void iniciar_mutex()
     pthread_mutex_init(&mutex_cola_blocked,NULL);
     pthread_mutex_init(&mutex_cola_io,NULL);
     pthread_mutex_init(&mutex_procesos_sistema,NULL);
+    pthread_mutex_init(&mutex_cola_join_wait,NULL);
 }
 
 void iniciar_hilos()
@@ -421,6 +427,7 @@ void liberar_mutex()
     pthread_mutex_destroy(&mutex_log);
     pthread_mutex_destroy(&mutex_socket_dispatch);
     pthread_mutex_destroy(&mutex_socket_interrupt);
+    pthread_mutex_destroy(&mutex_cola_join_wait);
 }
 
 void liberar_semaforos()

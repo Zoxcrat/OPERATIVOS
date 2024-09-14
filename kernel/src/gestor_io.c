@@ -15,7 +15,7 @@ void *gestor_io(void)
 
         // Tomar el primer proceso de la lista de procesos en cola IO
         pthread_mutex_lock(&mutex_cola_io);
-        TCB* hilo = list_get(cola_io, 0);
+        TCB* hilo = list_remove(cola_io, 0);
         pthread_mutex_unlock(&mutex_cola_io);
 
         pthread_mutex_lock(&mutex_log);
