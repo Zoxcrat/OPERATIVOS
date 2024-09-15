@@ -111,6 +111,7 @@ void finalizar_hilo(int pid,int hilo_id) {
         liberar_TCB(hilo);
         //DESBLOQUEAR HILOS BLOQUEADOS POR THREAD_JOIN / por mutex tomados por el hilo finalizado 
         mover_hilos_bloqueados_por_thread_join(hilo);
+        desbloquear_hilos_por_mutex(hilo);
 
         pthread_mutex_lock(&mutex_log);
         log_info(logger, "Hilo %d finalizado correctamente del proceso %d finalizado correctamente", hilo_id, pid);
@@ -192,6 +193,139 @@ void mover_hilos_bloqueados_por_thread_join(TCB* hilo){
     }
 }
 
+void desbloquear_hilos_por_mutex(TCB* hilo) {
+    // Obtener el proceso al que pertenece el hilo
+    PCB* proceso = obtener_proceso_por_pid(hilo->PID);
+
+    // Recorrer la lista de mutex del proceso
+    for (int i = 0; i < list_size(proceso->mutexs); i++) {
+        t_mutex* mutex = list_get(proceso->mutexs, i);
+
+        // Verificar si el mutex está tomado por el hilo que se está finalizando
+        if (mutex->TID == hilo->TID) {
+            // Si hay hilos bloqueados esperando este mutex, desbloquear al primero
+            if (list_size(mutex->cola_bloqueados) > 0) {
+                TCB* hilo_desbloqueado = list_remove(mutex->cola_bloqueados, 0);
+                mutex->TID = hilo_desbloqueado->TID; // Asignar el mutex al hilo desbloqueado
+
+                // Cambiar el estado del hilo desbloqueado a "READY" o su equivalente
+                hilo_desbloqueado->estado=READY;
+                agregar_a_ready(hilo_desbloqueado);
+
+                pthread_mutex_lock(&mutex_log);
+                log_info(logger, "Mutex '%s' reasignado al hilo TID: %d (anteriormente tomado por TID: %d)\n", 
+                         mutex->nombre, hilo_desbloqueado->TID, hilo->TID);
+                pthread_mutex_unlock(&mutex_log);
+            } else {
+                // No hay hilos bloqueados, liberar el mutex
+                mutex->TID = NULL; // Liberar el mutex (ningún hilo lo tiene)
+
+                pthread_mutex_lock(&mutex_log);
+                log_info(logger, "Mutex '%s' liberado (anteriormente tomado por TID: %d)\n", mutex->nombre, hilo->TID);
+                pthread_mutex_unlock(&mutex_log);
+            }
+        }
+    }
+}
+
+// MUTEXS
+void crear_mutex(char* nombre) {
+    PCB* proceso = obtener_proceso_por_pid(hilo_en_exec->PID);
+
+    t_mutex* nuevo_mutex = malloc(sizeof(t_mutex));
+    nuevo_mutex->nombre = nombre;   // Asignar un ID único
+    nuevo_mutex->cola_bloqueados = list_create();    // Asociar el mutex al proceso
+
+    list_add(proceso->mutexs, nuevo_mutex);
+
+    pthread_mutex_lock(&mutex_log);
+    log_info(logger, "Mutex con nombre %s creado para el proceso %d\n", nombre, proceso->PID);
+    pthread_mutex_unlock(&mutex_log);
+}
+
+void lockear_mutex(char* nombre) {
+    // Obtener el proceso al que pertenece el hilo en ejecución
+    PCB* proceso = obtener_proceso_por_pid(hilo_en_exec->PID);
+
+    // Buscar el mutex dentro del proceso que coincida con el nombre proporcionado
+    t_mutex* mutex = NULL;
+    for (int i = 0; i < list_size(proceso->mutexs); i++) {
+        t_mutex* m = list_get(proceso->mutexs, i);
+        if (strcmp(m->nombre, nombre) == 0) {
+            mutex = m;
+            break;
+        }
+    }
+    if (mutex == NULL) {
+        printf("Error: Mutex con nombre '%s' no encontrado en el proceso PID: %d\n", nombre, hilo_en_exec->PID);
+        return;
+    }
+    if (mutex->TID == NULL) {// El mutex está libre,
+        mutex->TID = hilo_en_exec->TID;
+        pthread_mutex_lock(&mutex_log);
+        log_info(logger, "Mutex '%s' asignado al hilo TID: %d\n", nombre, hilo_en_exec->TID);
+        pthread_mutex_unlock(&mutex_log);
+    } else {
+        pthread_mutex_lock(&mutex_log);
+        log_info(logger, "Mutex '%s' está ocupado, bloqueando hilo TID: %d\n", nombre, hilo_en_exec->TID);
+        pthread_mutex_unlock(&mutex_log);
+        
+        // Agregar el hilo en ejecución a la cola de bloqueados del mutex
+        list_add(mutex->cola_bloqueados, hilo_en_exec);
+
+        pthread_mutex_lock(&mutex_hilo_exec);
+        hilo_en_exec=NULL;
+        pthread_mutex_unlock(&mutex_hilo_exec);
+    }
+}
+
+void unlockear_mutex(char* nombre) {
+    PCB* proceso = obtener_proceso_por_pid(hilo_en_exec->PID);
+    t_mutex* mutex = NULL;
+    for (int i = 0; i < list_size(proceso->mutexs); i++) {
+        t_mutex* m = list_get(proceso->mutexs, i);
+        if (strcmp(m->nombre, nombre) == 0) {
+            mutex = m;
+            break;
+        }
+    }
+    if (mutex == NULL) {
+        printf("Error: Mutex con nombre '%s' no encontrado en el proceso PID: %d\n", nombre, proceso->PID);
+        return;
+    }
+
+    // Verificar si el mutex está tomado por el hilo en ejecución
+    if (mutex->TID != hilo_en_exec->TID) {
+        pthread_mutex_lock(&mutex_log);
+        log_info(logger, "Error: El hilo TID: %d no tiene el mutex '%s' asignado\n", hilo_en_exec->TID, nombre);
+        pthread_mutex_unlock(&mutex_log);
+        return;
+    }
+    if (list_size(mutex->cola_bloqueados) > 0) {
+        TCB* hilo_desbloqueado = list_remove(mutex->cola_bloqueados, 0);
+
+        // Asignar el mutex al hilo desbloqueado
+        mutex->TID = hilo_desbloqueado->TID;
+
+        // Cambiar el estado del hilo a "READY" (dependiendo de tu implementación)
+        hilo_desbloqueado->estado =READY;
+        agregar_a_ready(hilo_desbloqueado);
+
+        pthread_mutex_lock(&mutex_log);
+        log_info(logger, "Mutex '%s' reasignado al hilo TID: %d\n", nombre, hilo_desbloqueado->TID);
+        pthread_mutex_unlock(&mutex_log);
+    } else {
+        // No hay hilos bloqueados, liberar el mutex
+        mutex->TID == NULL;  // Liberar el mutex (o valor que indique que está libre)
+
+        pthread_mutex_lock(&mutex_log);
+        log_info(logger, "Mutex '%s' liberado por el hilo TID: %d\n", nombre, hilo_en_exec->TID);
+        pthread_mutex_unlock(&mutex_log);
+    }
+
+    // Devolver el control al hilo que realizó la syscall MUTEX_UNLOCK (ya está en exec)
+}
+
 // PEDIDOS A MEMORIA
 
 int informar_inicializacion_proceso_a_memoria(int pid, int tamanio){
@@ -249,6 +383,7 @@ int informar_finalizacion_hilo_a_memoria(int pid, int tid){
     close(fd_memoria);  // Cerrar la conexión con memoria
     return respuesta;
 }
+
 
 /// FUNCIONES AUXILIARES ///
 bool buscar_por_pid(void* proceso) {
@@ -315,7 +450,7 @@ void eliminar_hilos_asociados(PCB* proceso) {
         pthread_mutex_unlock(&mutex_cola_io);
     }
 }
-//MODIFICAR EN BASE A ESTADO
+
 TCB* buscar_hilo_por_pid_tid(int pid_a_buscar, int tid_a_buscar) {
     TCB* hilo = NULL;
     // Dependiendo del estado del hilo, buscamos en la cola correspondiente

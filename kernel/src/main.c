@@ -260,15 +260,39 @@ void procesar_conexion_cpu_dispatch() {
                 break;
             }
             case MUTEX_CREATE: {
-                // FALTA IMPLEMENTAR
+                pthread_mutex_lock(&mutex_log);
+                log_info(logger_obligatorio, "Recibí MUTEX_CREATE");
+                pthread_mutex_unlock(&mutex_log);
+
+                char* nombre_mutex = malloc(sizeof(char*));
+                if (recv(fd_cpu_dispatch, &nombre_mutex, sizeof(char*), MSG_WAITALL) > 0) {
+                    crear_mutex(nombre_mutex);
+                    free(nombre_mutex);
+                }
                 break;
             }
             case MUTEX_LOCK: {
-                // FALTA IMPLEMENTAR
+                pthread_mutex_lock(&mutex_log);
+                log_info(logger_obligatorio, "Recibí MUTEX_LOCK");
+                pthread_mutex_unlock(&mutex_log);
+
+                char* nombre_mutex = malloc(sizeof(char*));
+                if (recv(fd_cpu_dispatch, &nombre_mutex, sizeof(char*), MSG_WAITALL) > 0) {
+                    lockear_mutex(nombre_mutex);
+                    free(nombre_mutex);
+                }
                 break;
             }
             case MUTEX_UNLOCK: {
-                // FALTA IMPLEMENTAR
+                pthread_mutex_lock(&mutex_log);
+                log_info(logger_obligatorio, "Recibí MUTEX_UNLOCK");
+                pthread_mutex_unlock(&mutex_log);
+
+                char* nombre_mutex = malloc(sizeof(char*));
+                if (recv(fd_cpu_dispatch, &nombre_mutex, sizeof(char*), MSG_WAITALL) > 0) {
+                    unlockear_mutex(nombre_mutex);
+                    free(nombre_mutex);
+                }
                 break;
             }
             case DUMP_MEMORY: {

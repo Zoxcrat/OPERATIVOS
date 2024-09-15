@@ -57,6 +57,11 @@ typedef struct {
     int tid_esperado;  // TID del hilo esperado
 } t_join_wait;
 
+typedef struct {
+    char* nombre;               // Identificador único del mutex
+    int TID;                    // TID del hilo que posee el mutex (si está ocupado)
+    t_list* cola_bloqueados;    // Lista de hilos bloqueados esperando el mutex
+} t_mutex;
 
 // Variables config
 extern t_log* logger_obligatorio;
