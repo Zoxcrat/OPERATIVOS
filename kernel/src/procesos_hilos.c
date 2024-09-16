@@ -11,9 +11,10 @@ void crear_proceso(char *archivo_pseudocodigo, int tamanio_proceso, int priorida
     nuevo_proceso->prioridad_hilo_0 = prioridad_hilo_0; // lo pongo en el pcb por si todavia no se puede inicializar el proceso en memoria
 
     pthread_mutex_lock(&mutex_log);
-    log_info(logger,"Proceso %d creado correctamente",nuevo_proceso->PID);
+    log_info(logger_obligatorio, "## (%d:0) Se crea el proceso - Estado: NEW", nuevo_proceso->PID);
     pthread_mutex_unlock(&mutex_log);
-    
+
+
     pthread_mutex_lock(&mutex_procesos_en_new);
     list_add(cola_new,nuevo_proceso);
     pthread_mutex_unlock(&mutex_procesos_en_new);
@@ -60,11 +61,11 @@ void finalizar_proceso(int proceso_id){
             eliminar_hilos_asociados(proceso);
             liberar_PCB(proceso);
 
-            sem_post(&verificar_cola_new);
-            
             pthread_mutex_lock(&mutex_log);
-            log_info(logger, "Proceso %d y sus hilos han sido liberados correctamente", proceso->PID);
+            log_info(logger_obligatorio, "“## Finaliza el proceso %d", hilo_en_exec->PID);
             pthread_mutex_unlock(&mutex_log);
+
+            sem_post(&verificar_cola_new);
         }else {
             pthread_mutex_lock(&mutex_log);
             log_error(logger, "No se pudo finalizar el proceso %d.", proceso_id);
@@ -93,7 +94,7 @@ void crear_hilo(PCB* proceso, int prioridad, char* archivo_pseudocodigo) {
         agregar_a_ready(nuevo_tcb);
 
         pthread_mutex_lock(&mutex_log);
-        log_info(logger, "Hilo %d para el proceso %d creado correctamente",nuevo_tcb->TID, proceso->PID);
+        log_info(logger_obligatorio, "Creación de Hilo: “## (%d:%d) Se crea el Hilo - Estado: READY", nuevo_tcb->PID,nuevo_tcb->TID);
         pthread_mutex_unlock(&mutex_log);
     }
     else{
@@ -114,7 +115,7 @@ void finalizar_hilo(int pid,int hilo_id) {
         desbloquear_hilos_por_mutex(hilo);
 
         pthread_mutex_lock(&mutex_log);
-        log_info(logger, "Hilo %d finalizado correctamente del proceso %d finalizado correctamente", hilo_id, pid);
+        log_info(logger_obligatorio, "## (%d:%d) Finaliza el hilo",pid, hilo_id);
         pthread_mutex_unlock(&mutex_log);
     } else {
         pthread_mutex_lock(&mutex_log);
@@ -280,8 +281,9 @@ void lockear_mutex(char* nombre) {
         pthread_mutex_unlock(&mutex_log);
     } else {
         pthread_mutex_lock(&mutex_log);
-        log_info(logger, "Mutex '%s' está ocupado, bloqueando hilo TID: %d del proceso %d\n", nombre, hilo_en_exec->TID,hilo_en_exec->PID);
+        log_info(logger_obligatorio, "## (%d:%d) - Bloqueado por: MUTEX", hilo_en_exec->PID,hilo_en_exec->TID);
         pthread_mutex_unlock(&mutex_log);
+        hilo_desalojado = true;
         
         // Agregar el hilo en ejecución a la cola de bloqueados del mutex
         list_add(mutex->cola_bloqueados, hilo_en_exec);
@@ -291,6 +293,7 @@ void lockear_mutex(char* nombre) {
         pthread_mutex_unlock(&mutex_hilo_exec);
 
         sem_post(&hay_hilos_en_ready);
+        sem_post(&mandar_interrupcion);
     }
 }
 

@@ -32,17 +32,23 @@ void *gestor_dump_memory(void)
             int respuesta;
             recv(fd_cpu_dispatch, &respuesta, sizeof(int), 0);
 
-            pthread_mutex_lock(&mutex_log);
-            log_warning(logger, "El hilo %d del proceso %d completo el DUMP_MEMORY, vuelve a READY",hilo->TID,hilo->PID);
-            pthread_mutex_unlock(&mutex_log);
+            if (respuesta == 1){
+                pthread_mutex_lock(&mutex_log);
+                log_warning(logger, "El hilo %d del proceso %d completo el DUMP_MEMORY, vuelve a READY",hilo->TID,hilo->PID);
+                pthread_mutex_unlock(&mutex_log);
 
-            // Pasar el proceso a READY
-            hilo->estado = READY;
-            agregar_a_ready(hilo);
+                // Pasar el proceso a READY
+                hilo->estado = READY;
+                agregar_a_ready(hilo);
+                
+                close(fd_memoria);
+
+                sem_post(&hay_hilos_en_ready);
+            }else{
+                finalizar_hilo(hilo->PID,hilo->TID);
+            }
+
             
-            close(fd_memoria);
-
-            sem_post(&hay_hilos_en_ready);
         }
     }
 }

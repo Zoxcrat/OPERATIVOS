@@ -29,7 +29,9 @@ t_list* cola_io;
 t_list* cola_joins;
 t_list* cola_dump_memory; 
 TCB* hilo_en_exec;
+TCB* hilo_inicial;
 int pid_a_buscar;
+bool hilo_desalojado; 
 
 // Semaforos
 sem_t verificar_cola_new;
@@ -38,12 +40,14 @@ sem_t hay_hilos_en_io;
 sem_t hay_hilos_en_dump_memory;
 sem_t sem_io_mutex;
 sem_t mandar_interrupcion;
+sem_t comenzar_quantum;
 
 // Hilos
 pthread_t* planificador_largo_plazo;
 pthread_t* planificador_corto_plazo;
 pthread_t* hilo_gestor_io;
 pthread_t* hilo_gestor_dump_memory;
+pthread_t* hilo_gestor_quantum;
 pthread_t* conexion_cpu_dispatch;
 pthread_t* conexion_cpu_interrupt;
 
@@ -101,6 +105,9 @@ int main(int argc, char **argv)
     inicializar_plani_largo_plazo();
     inicializar_plani_corto_plazo();
     inicializar_gestor_io();
+    if (ALGORITMO_PLANIFICACION == COLAS_MULTINIVEL){
+        inicializar_gestor_quantum();
+    }
 
     crear_proceso(archivo_pseudocodigo, tamanio_proceso, 0);
 
@@ -175,7 +182,7 @@ void procesar_conexion_cpu_dispatch() {
         switch (codigo_syscall) {
             case PROCESS_CREATE: {
                 pthread_mutex_lock(&mutex_log);
-                log_info(logger_obligatorio, "Recibí PROCESS_CREATE");
+                log_info(logger_obligatorio, "## (%d:%d) - Solicitó syscall: PROCESS_CREATE", hilo_en_exec->PID,hilo_en_exec->TID);
                 pthread_mutex_unlock(&mutex_log);
 
                 t_syscall_process_create* syscall_data = malloc(sizeof(t_syscall_process_create));
@@ -189,7 +196,7 @@ void procesar_conexion_cpu_dispatch() {
             }
             case PROCESS_EXIT: {
                 pthread_mutex_lock(&mutex_log);
-                log_info(logger, "Recibí PROCESS_EXIT");
+                log_info(logger_obligatorio, "## (%d:%d) - Solicitó syscall: PROCESS_EXIT", hilo_en_exec->PID,hilo_en_exec->TID);
                 pthread_mutex_unlock(&mutex_log);
                 
                 finalizar_proceso(hilo_en_exec->PID);
@@ -198,7 +205,7 @@ void procesar_conexion_cpu_dispatch() {
             case THREAD_CREATE: {
                 // Recibir los parámetros específicos de THREAD_CREATE
                 pthread_mutex_lock(&mutex_log);
-                log_info(logger, "Recibí THREAD_CREATE");
+                log_info(logger_obligatorio, "## (%d:%d) - Solicitó syscall: THREAD_CREATE", hilo_en_exec->PID,hilo_en_exec->TID);
                 pthread_mutex_unlock(&mutex_log);
 
                 t_syscall_thread_create* syscall_data = malloc(sizeof(t_syscall_thread_create));
@@ -216,8 +223,9 @@ void procesar_conexion_cpu_dispatch() {
             }
             case THREAD_JOIN: {
                 pthread_mutex_lock(&mutex_log);
-                log_info(logger, "Recibí THREAD_JOIN");
+                log_info(logger_obligatorio, "## (%d:%d) - Solicitó syscall: THREAD_JOIN", hilo_en_exec->PID,hilo_en_exec->TID);
                 pthread_mutex_unlock(&mutex_log);
+
 
                 int TID;
                 if (recv(fd_cpu_dispatch, &TID, sizeof(int), MSG_WAITALL) > 0) {
@@ -242,8 +250,9 @@ void procesar_conexion_cpu_dispatch() {
             case THREAD_CANCEL: {
                 // Recibir los parámetros específicos de THREAD_CREATE
                 pthread_mutex_lock(&mutex_log);
-                log_info(logger, "Recibí THREAD_CANCEL");
+                log_info(logger_obligatorio, "## (%d:%d) - Solicitó syscall: THREAD_CANCEL", hilo_en_exec->PID,hilo_en_exec->TID);
                 pthread_mutex_unlock(&mutex_log);
+
                 int TID;
                 if (recv(fd_cpu_dispatch, &TID, sizeof(int), MSG_WAITALL) > 0) {
                     TCB* hilo_requerido = buscar_hilo_por_pid_tid(hilo_en_exec->PID, TID);
@@ -255,13 +264,18 @@ void procesar_conexion_cpu_dispatch() {
                 break;
             }
             case THREAD_EXIT: {
+                pthread_mutex_lock(&mutex_log);
+                log_info(logger_obligatorio, "## (%d:%d) - Solicitó syscall: THREAD_EXIT", hilo_en_exec->PID,hilo_en_exec->TID);
+                pthread_mutex_unlock(&mutex_log);
+
                 finalizar_hilo(hilo_en_exec->PID, hilo_en_exec->TID);
                 break;
             }
             case MUTEX_CREATE: {
                 pthread_mutex_lock(&mutex_log);
-                log_info(logger_obligatorio, "Recibí MUTEX_CREATE");
+                log_info(logger_obligatorio, "## (%d:%d) - Solicitó syscall: MUTEX_CREATE", hilo_en_exec->PID,hilo_en_exec->TID);
                 pthread_mutex_unlock(&mutex_log);
+
 
                 char* nombre_mutex = malloc(sizeof(char*));
                 if (recv(fd_cpu_dispatch, &nombre_mutex, sizeof(char*), MSG_WAITALL) > 0) {
@@ -272,7 +286,7 @@ void procesar_conexion_cpu_dispatch() {
             }
             case MUTEX_LOCK: {
                 pthread_mutex_lock(&mutex_log);
-                log_info(logger_obligatorio, "Recibí MUTEX_LOCK");
+                log_info(logger_obligatorio, "## (%d:%d) - Solicitó syscall: MUTEX_LOCK", hilo_en_exec->PID,hilo_en_exec->TID);
                 pthread_mutex_unlock(&mutex_log);
 
                 char* nombre_mutex = malloc(sizeof(char*));
@@ -284,8 +298,9 @@ void procesar_conexion_cpu_dispatch() {
             }
             case MUTEX_UNLOCK: {
                 pthread_mutex_lock(&mutex_log);
-                log_info(logger_obligatorio, "Recibí MUTEX_UNLOCK");
+                log_info(logger_obligatorio, "## (%d:%d) - Solicitó syscall: MUTEX_UNLOCK", hilo_en_exec->PID,hilo_en_exec->TID);
                 pthread_mutex_unlock(&mutex_log);
+
 
                 char* nombre_mutex = malloc(sizeof(char*));
                 if (recv(fd_cpu_dispatch, &nombre_mutex, sizeof(char*), MSG_WAITALL) > 0) {
@@ -296,9 +311,15 @@ void procesar_conexion_cpu_dispatch() {
             }
             case DUMP_MEMORY: {
                 pthread_mutex_lock(&mutex_log);
-                log_info(logger, "Recibí THREAD_DUMP_MEMORY");
+                log_info(logger_obligatorio, "## (%d:%d) - Solicitó syscall: DUMP_MEMORY", hilo_en_exec->PID,hilo_en_exec->TID);
                 pthread_mutex_unlock(&mutex_log);
 
+                pthread_mutex_lock(&mutex_log);
+                log_info(logger_obligatorio, "## (%d:%d) - Bloqueado por: DUMP_MEMORY", hilo_en_exec->PID,hilo_en_exec->TID);
+                pthread_mutex_unlock(&mutex_log);
+
+                hilo_desalojado = true;
+                
                 pthread_mutex_lock(&mutex_hilo_exec);
                 TCB* hilo = hilo_en_exec;
                 hilo_en_exec = NULL;
@@ -313,21 +334,33 @@ void procesar_conexion_cpu_dispatch() {
                 sem_post(&hay_hilos_en_dump_memory);
             }
             case IO: {
+                pthread_mutex_lock(&mutex_log);
+                log_info(logger_obligatorio, "## (%d:%d) - Solicitó syscall: IO", hilo_en_exec->PID,hilo_en_exec->TID);
+                pthread_mutex_unlock(&mutex_log);
+
                 int tiempo_IO_milisegundos;
                 if (recv(fd_cpu_dispatch, &tiempo_IO_milisegundos, sizeof(int), MSG_WAITALL) > 0){
+                    hilo_desalojado = true;
+                    pthread_mutex_lock(&mutex_log);
+                    log_info(logger_obligatorio, "## (%d:%d) - Bloqueado por: IO", hilo_en_exec->PID,hilo_en_exec->TID);
+                    pthread_mutex_unlock(&mutex_log);
+
+                    pthread_mutex_lock(&mutex_hilo_exec);
                     TCB* hilo = hilo_en_exec;
                     hilo->tiempo_bloqueo_io = tiempo_IO_milisegundos;
                     hilo->estado = BLOCKED_IO;
+                    pthread_mutex_unlock(&mutex_hilo_exec);
                     
                     pthread_mutex_lock(&mutex_cola_io);
                     list_add(cola_io,hilo);
-                    pthread_mutex_lock(&mutex_cola_io);
+                    pthread_mutex_unlock(&mutex_cola_io);
                     
                     pthread_mutex_lock(&mutex_hilo_exec);
                     hilo_en_exec = NULL;
-                    pthread_mutex_lock(&mutex_hilo_exec);
+                    pthread_mutex_unlock(&mutex_hilo_exec);
 
                     sem_post(&hay_hilos_en_io);
+                    sem_post(&mandar_interrupcion);
                 }
             }
             default: {
@@ -344,10 +377,6 @@ void procesar_conexion_cpu_interrupt(){
 
         int interrupcion = 1;
         send(fd_cpu_interrupt, &interrupcion, sizeof(int), 0);  // Enviar la interrupción
-
-        pthread_mutex_lock(&mutex_log);
-        log_info(logger, "Se envió una interrupción a la CPU por fin de QUANTUM.");
-        pthread_mutex_unlock(&mutex_log);
     }
 }
 
@@ -381,6 +410,7 @@ void iniciar_semaforos()
     sem_init(&hay_hilos_en_ready, 0, 0);
     sem_init(&hay_hilos_en_io, 0, 0);
     sem_init(&hay_hilos_en_dump_memory, 0, 0);
+    sem_init(&comenzar_quantum, 0, 0);
     sem_init(&mandar_interrupcion, 0, 0);
     sem_init(&sem_io_mutex, 0, 1); // Inicializa con 1 para permitir acceso exclusivo
 }
@@ -406,6 +436,7 @@ void iniciar_hilos()
     conexion_cpu_dispatch = malloc(sizeof(pthread_t));
     hilo_gestor_io = malloc(sizeof(pthread_t));
     hilo_gestor_dump_memory = malloc(sizeof(pthread_t));
+    hilo_gestor_quantum = malloc(sizeof(pthread_t));
     planificador_corto_plazo = malloc(sizeof(pthread_t));
     planificador_largo_plazo = malloc(sizeof(pthread_t));
 }
@@ -455,6 +486,7 @@ void liberar_semaforos()
     sem_destroy(&hay_hilos_en_ready);
     sem_destroy(&hay_hilos_en_io);
     sem_destroy(&hay_hilos_en_dump_memory);
+    sem_destroy(&comenzar_quantum);
     sem_destroy(&sem_io_mutex);
     sem_destroy(&mandar_interrupcion);
 }
@@ -464,6 +496,7 @@ void liberar_hilos()
     free(planificador_largo_plazo);
     free(planificador_corto_plazo);
     free(hilo_gestor_io);
+    free(hilo_gestor_quantum);
     free(conexion_cpu_dispatch);
     free(conexion_cpu_interrupt);
 }

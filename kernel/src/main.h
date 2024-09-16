@@ -95,7 +95,9 @@ extern t_list* cola_joins;
 extern t_list* cola_dump_memory; 
 extern bool io_en_uso;// Estado que indica si el I/O está en uso
 extern TCB* hilo_en_exec;
+extern TCB* hilo_inicial;
 extern int pid_a_buscar; 
+extern bool hilo_desalojado; 
 
 // Semaforos
 extern sem_t hay_hilos_en_dump_memory;
@@ -104,12 +106,14 @@ extern sem_t hay_hilos_en_ready;
 extern sem_t sem_io_mutex;
 extern sem_t mandar_interrupcion;
 extern sem_t hay_hilos_en_io;
+extern sem_t comenzar_quantum;
 
 // Hilos
 extern pthread_t* planificador_largo_plazo;
 extern pthread_t* planificador_corto_plazo;
 extern pthread_t* hilo_gestor_dump_memory;
 extern pthread_t* hilo_gestor_io;
+extern pthread_t* hilo_gestor_quantum;
 extern pthread_t* conexion_cpu_dispatch;
 extern pthread_t* conexion_cpu_interrupt;
 

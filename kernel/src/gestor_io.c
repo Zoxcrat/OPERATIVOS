@@ -28,7 +28,7 @@ void *gestor_io(void)
 
             // Loggear que el proceso terminó el I/O
             pthread_mutex_lock(&mutex_log);
-            log_warning(logger, "El hilo %d del proceso %d salió del I/O y pasa a READY", hilo->TID,hilo->PID);
+            log_info(logger, "## (%d:%d) finalizó IO y pasa a READY", hilo->TID,hilo->PID);
             pthread_mutex_unlock(&mutex_log);
 
             // Pasar el proceso a READY
