@@ -24,7 +24,10 @@ typedef enum{
 	NEW,
 	READY,
 	EXEC,
-	BLOCKED,
+	BLOCKED_IO,
+	BLOCKED_TJ,
+	BLOCKED_MUTEX,
+	BLOCKED_DM,
 	EXIT
 } estado;
 typedef struct {
@@ -53,7 +56,7 @@ typedef struct {
 
 typedef struct {
     int pid;           // PID del proceso (el mismo para el hilo esperador y el esperado)
-    int tid_esperador; // TID del hilo que espera
+    TCB* tid_esperador; // TID del hilo que espera
     int tid_esperado;  // TID del hilo esperado
 } t_join_wait;
 
@@ -87,19 +90,17 @@ extern t_list* procesos_sistema;
 extern t_list* cola_new;
 extern t_list* cola_ready;
 extern t_list* cola_ready_multinivel;
-extern t_list* cola_blocked;
 extern t_list* cola_io;
-extern t_list* lista_joins; 
+extern t_list* cola_joins; 
+extern t_list* cola_dump_memory; 
 extern bool io_en_uso;// Estado que indica si el I/O está en uso
-extern t_list* cola_exit;
 extern TCB* hilo_en_exec;
-extern int tiempo_a_bloquear;
 extern int pid_a_buscar; 
 
 // Semaforos
+extern sem_t hay_hilos_en_dump_memory;
 extern sem_t verificar_cola_new;
 extern sem_t hay_hilos_en_ready;
-extern sem_t hay_hilos_en_blocked;
 extern sem_t sem_io_mutex;
 extern sem_t mandar_interrupcion;
 extern sem_t hay_hilos_en_io;
@@ -107,6 +108,7 @@ extern sem_t hay_hilos_en_io;
 // Hilos
 extern pthread_t* planificador_largo_plazo;
 extern pthread_t* planificador_corto_plazo;
+extern pthread_t* hilo_gestor_dump_memory;
 extern pthread_t* hilo_gestor_io;
 extern pthread_t* conexion_cpu_dispatch;
 extern pthread_t* conexion_cpu_interrupt;
@@ -116,13 +118,13 @@ extern pthread_mutex_t mutex_procesos_en_new;
 extern pthread_mutex_t mutex_procesos_sistema;
 extern pthread_mutex_t mutex_cola_ready;
 extern pthread_mutex_t mutex_colas_multinivel;
-extern pthread_mutex_t mutex_cola_blocked;
 extern pthread_mutex_t mutex_cola_io;
+extern pthread_mutex_t mutex_cola_join_wait;
+extern pthread_mutex_t mutex_cola_dump_memory;
 extern pthread_mutex_t mutex_log;
 extern pthread_mutex_t mutex_socket_dispatch;
 extern pthread_mutex_t mutex_socket_interrupt;
 extern pthread_mutex_t mutex_hilo_exec;
-extern pthread_mutex_t mutex_cola_join_wait;
 
 // Funciones
 void leer_config();
@@ -144,5 +146,6 @@ void liberar_hilos();
 #include <plani_largo_plazo.h>
 #include <procesos_hilos.h>
 #include <gestor_io.h>
+#include <gestor_dump_memory.h>
 
 #endif

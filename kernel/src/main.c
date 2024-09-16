@@ -24,20 +24,18 @@ t_list* procesos_sistema;
 t_list* cola_new;
 t_list* cola_ready;
 t_list* cola_ready_multinivel;
-t_list* cola_blocked;
 bool io_en_uso; // Estado que indica si el I/O está en uso
 t_list* cola_io;
-t_list* lista_joins;
-t_list* cola_exit;
+t_list* cola_joins;
+t_list* cola_dump_memory; 
 TCB* hilo_en_exec;
-int tiempo_a_bloquear;
 int pid_a_buscar;
 
 // Semaforos
 sem_t verificar_cola_new;
 sem_t hay_hilos_en_ready;
-sem_t hay_hilos_en_blocked;
 sem_t hay_hilos_en_io;
+sem_t hay_hilos_en_dump_memory;
 sem_t sem_io_mutex;
 sem_t mandar_interrupcion;
 
@@ -45,6 +43,7 @@ sem_t mandar_interrupcion;
 pthread_t* planificador_largo_plazo;
 pthread_t* planificador_corto_plazo;
 pthread_t* hilo_gestor_io;
+pthread_t* hilo_gestor_dump_memory;
 pthread_t* conexion_cpu_dispatch;
 pthread_t* conexion_cpu_interrupt;
 
@@ -53,13 +52,13 @@ pthread_mutex_t mutex_procesos_en_new;
 pthread_mutex_t mutex_procesos_sistema;
 pthread_mutex_t mutex_cola_ready;
 pthread_mutex_t mutex_colas_multinivel;
-pthread_mutex_t mutex_cola_blocked;
 pthread_mutex_t mutex_cola_io;
 pthread_mutex_t mutex_log;
 pthread_mutex_t mutex_socket_dispatch;
 pthread_mutex_t mutex_socket_interrupt;
 pthread_mutex_t mutex_hilo_exec;
 pthread_mutex_t mutex_cola_join_wait;
+pthread_mutex_t mutex_cola_dump_memory;
 
 int main(int argc, char **argv)
 {
@@ -299,41 +298,35 @@ void procesar_conexion_cpu_dispatch() {
                 pthread_mutex_lock(&mutex_log);
                 log_info(logger, "Recibí THREAD_DUMP_MEMORY");
                 pthread_mutex_unlock(&mutex_log);
-                
-                // Crear conexión efímera a la memoria
-                conectar_memoria();
-                t_paquete* paquete = crear_paquete();
-                agregar_a_paquete(paquete, &hilo_en_exec->PID, sizeof(int));
-                agregar_a_paquete(paquete, &hilo_en_exec->TID, sizeof(int));
-                enviar_peticion(paquete,fd_memoria,DUMP_MEMORY);
-                eliminar_paquete(paquete);
-                
-                //bloquea el hilo que lo solicito
-                pthread_mutex_lock(&mutex_cola_blocked);
-                list_add(cola_blocked, hilo_en_exec);
-                pthread_mutex_lock(&mutex_cola_blocked);
+
                 pthread_mutex_lock(&mutex_hilo_exec);
                 TCB* hilo = hilo_en_exec;
                 hilo_en_exec = NULL;
-                pthread_mutex_lock(&mutex_hilo_exec);
-                int respuesta; 
-                recv(fd_memoria, &respuesta, sizeof(int), 0);
-                if (respuesta == 1){
-                    pthread_mutex_lock(&mutex_cola_blocked);
-                    list_remove_element(cola_blocked, hilo);
-                    pthread_mutex_lock(&mutex_cola_blocked);
+                pthread_mutex_unlock(&mutex_hilo_exec);
 
-                    agregar_a_ready(hilo);
-                }
-                else{
-                    finalizar_proceso(hilo_en_exec->PID);
-                }
-                close(fd_memoria);  // Cerrar la conexión con memoria
-                }
+                hilo->estado = BLOCKED_DM;
+                
+                pthread_mutex_lock(&mutex_cola_dump_memory);
+                list_add(cola_dump_memory, hilo);
+                pthread_mutex_unlock(&mutex_cola_dump_memory);
+                
+                sem_post(&hay_hilos_en_dump_memory);
+            }
             case IO: {
                 int tiempo_IO_milisegundos;
                 if (recv(fd_cpu_dispatch, &tiempo_IO_milisegundos, sizeof(int), MSG_WAITALL) > 0){
-                    tiempo_a_bloquear = tiempo_IO_milisegundos;
+                    TCB* hilo = hilo_en_exec;
+                    hilo->tiempo_bloqueo_io = tiempo_IO_milisegundos;
+                    hilo->estado = BLOCKED_IO;
+                    
+                    pthread_mutex_lock(&mutex_cola_io);
+                    list_add(cola_io,hilo);
+                    pthread_mutex_lock(&mutex_cola_io);
+                    
+                    pthread_mutex_lock(&mutex_hilo_exec);
+                    hilo_en_exec = NULL;
+                    pthread_mutex_lock(&mutex_hilo_exec);
+
                     sem_post(&hay_hilos_en_io);
                 }
             }
@@ -373,8 +366,9 @@ void inicializar_estructuras()
     cola_new = list_create();
     cola_ready = list_create();
     cola_ready_multinivel = list_create();
-    cola_blocked = list_create();
-    cola_exit = list_create();
+    cola_io = list_create();
+    cola_dump_memory = list_create();
+    cola_joins = list_create();
 
     iniciar_semaforos();
     iniciar_mutex();
@@ -385,8 +379,8 @@ void iniciar_semaforos()
 {
     sem_init(&verificar_cola_new, 0, 0);
     sem_init(&hay_hilos_en_ready, 0, 0);
-    sem_init(&hay_hilos_en_blocked, 0, 0);
     sem_init(&hay_hilos_en_io, 0, 0);
+    sem_init(&hay_hilos_en_dump_memory, 0, 0);
     sem_init(&mandar_interrupcion, 0, 0);
     sem_init(&sem_io_mutex, 0, 1); // Inicializa con 1 para permitir acceso exclusivo
 }
@@ -400,10 +394,10 @@ void iniciar_mutex()
     pthread_mutex_init(&mutex_socket_dispatch,NULL);
     pthread_mutex_init(&mutex_socket_interrupt,NULL);
     pthread_mutex_init(&mutex_hilo_exec,NULL);
-    pthread_mutex_init(&mutex_cola_blocked,NULL);
     pthread_mutex_init(&mutex_cola_io,NULL);
     pthread_mutex_init(&mutex_procesos_sistema,NULL);
     pthread_mutex_init(&mutex_cola_join_wait,NULL);
+    pthread_mutex_init(&mutex_cola_dump_memory,NULL);
 }
 
 void iniciar_hilos()
@@ -411,6 +405,7 @@ void iniciar_hilos()
     conexion_cpu_interrupt = malloc(sizeof(pthread_t));
     conexion_cpu_dispatch = malloc(sizeof(pthread_t));
     hilo_gestor_io = malloc(sizeof(pthread_t));
+    hilo_gestor_dump_memory = malloc(sizeof(pthread_t));
     planificador_corto_plazo = malloc(sizeof(pthread_t));
     planificador_largo_plazo = malloc(sizeof(pthread_t));
 }
@@ -422,8 +417,9 @@ void terminar_programa()
     list_destroy(cola_new);
     list_destroy(cola_ready);
     list_destroy(cola_ready_multinivel);
-    list_destroy(cola_blocked);
-    list_destroy(cola_exit);
+    list_destroy(cola_io);
+    list_destroy(cola_dump_memory);
+    list_destroy(cola_joins);
     free(hilo_en_exec);
 
     log_destroy(logger);
@@ -445,7 +441,6 @@ void liberar_mutex()
     pthread_mutex_destroy(&mutex_procesos_sistema);
     pthread_mutex_destroy(&mutex_cola_ready);
     pthread_mutex_destroy(&mutex_colas_multinivel);
-    pthread_mutex_destroy(&mutex_cola_blocked);
     pthread_mutex_destroy(&mutex_cola_io);
     pthread_mutex_destroy(&mutex_hilo_exec);
     pthread_mutex_destroy(&mutex_log);
@@ -458,8 +453,8 @@ void liberar_semaforos()
 {
     sem_destroy(&verificar_cola_new);
     sem_destroy(&hay_hilos_en_ready);
-    sem_destroy(&hay_hilos_en_blocked);
     sem_destroy(&hay_hilos_en_io);
+    sem_destroy(&hay_hilos_en_dump_memory);
     sem_destroy(&sem_io_mutex);
     sem_destroy(&mandar_interrupcion);
 }

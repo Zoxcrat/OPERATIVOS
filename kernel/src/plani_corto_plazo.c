@@ -156,20 +156,16 @@ void agregar_a_ready(TCB* tcb){
 
 void manejar_thread_join(int tid_a_unir) {
     TCB* hilo_esperador = hilo_en_exec;
-    hilo_esperador->estado = BLOCKED;
-
-    pthread_mutex_lock(&mutex_cola_blocked);
-    list_add(cola_blocked, hilo_esperador);
-    pthread_mutex_unlock(&mutex_cola_blocked);
+    hilo_esperador->estado = BLOCKED_TJ;
 
     // Añadir relación pid <-> tid_esperador <-> tid_esperado a la lista de joins
     t_join_wait* nueva_relacion = malloc(sizeof(t_join_wait));
     nueva_relacion->pid = hilo_esperador->PID;
-    nueva_relacion->tid_esperador = hilo_esperador->TID;
+    nueva_relacion->tid_esperador = hilo_esperador;
     nueva_relacion->tid_esperado = tid_a_unir;
 
     pthread_mutex_lock(&mutex_cola_join_wait);
-    list_add(lista_joins, nueva_relacion);
+    list_add(cola_joins, nueva_relacion);
     pthread_mutex_lock(&mutex_cola_join_wait);
 
     pthread_mutex_lock(&mutex_hilo_exec);

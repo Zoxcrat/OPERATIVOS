@@ -109,7 +109,7 @@ void finalizar_hilo(int pid,int hilo_id) {
     TCB* hilo = buscar_hilo_por_pid_tid(pid,hilo_id);
     if (respuesta == 1) {
         liberar_TCB(hilo);
-        //DESBLOQUEAR HILOS BLOQUEADOS POR THREAD_JOIN / por mutex tomados por el hilo finalizado 
+        
         mover_hilos_bloqueados_por_thread_join(hilo);
         desbloquear_hilos_por_mutex(hilo);
 
@@ -124,77 +124,94 @@ void finalizar_hilo(int pid,int hilo_id) {
 }
 
 void liberar_PCB(PCB* proceso) {
-    list_destroy(proceso->TIDs);
-    list_destroy(proceso->mutexs);
-    free(proceso->archivo_pseudocodigo_principal);
-
     pthread_mutex_lock(&mutex_procesos_sistema);
     list_remove_element(procesos_sistema, proceso);
     pthread_mutex_unlock(&mutex_procesos_sistema);
 
+    list_destroy(proceso->TIDs);
+    list_destroy(proceso->mutexs);
+    free(proceso->archivo_pseudocodigo_principal);
     free(proceso);
 }
 
 void liberar_TCB(TCB* hilo) {
+    PCB* proceso_asociado = obtener_proceso_por_pid(hilo->PID);
+    list_remove_element(proceso_asociado->TIDs, hilo->TID);
+
     switch(hilo->estado) {
         case READY:
-            // Si está en cola_ready o cola_ready_multinivel
             if (ALGORITMO_PLANIFICACION == COLAS_MULTINIVEL) {
-                pthread_mutex_lock(&mutex_colas_multinivel);
-                t_cola_multinivel* cola_encontrada = NULL;
                 for (int i = 0; i < list_size(cola_ready_multinivel); i++) {
                     t_cola_multinivel* cola_actual = list_get(cola_ready_multinivel, i);
                     if (cola_actual->prioridad == hilo->prioridad) {
-                        cola_encontrada = cola_actual;
+                        remover_hilo_de_cola(cola_actual->cola, hilo->PID, hilo->TID, &mutex_colas_multinivel);
+                    }
+                }
+            } else {
+                remover_hilo_de_cola(cola_ready, hilo->PID, hilo->TID, &mutex_cola_ready);
+            }
+            break;
+        case BLOCKED_IO:
+            remover_hilo_de_cola(cola_io, hilo->PID, hilo->TID, &mutex_cola_io);
+            break;
+        case BLOCKED_TJ:
+            pthread_mutex_lock(&mutex_cola_join_wait);
+            for (int i = 0; i < list_size(cola_joins); i++) {
+                t_join_wait* relacion = list_get(cola_joins, i);
+                if (relacion->pid == hilo->PID && relacion->tid_esperador->TID == hilo->TID) {
+                    // Liberar el hilo esperador de la relación de join
+                    liberar_TCB(relacion->tid_esperador);
+                    list_remove_and_destroy_element(cola_joins, i, free);
+                    break;
+                }
+            }
+            pthread_mutex_unlock(&mutex_cola_join_wait);
+            break;
+
+        case BLOCKED_MUTEX:
+            // Revisar los mutex asociados al proceso para eliminar el hilo bloqueado
+            for (int i = 0; i < list_size(proceso_asociado->mutexs); i++) {
+                t_mutex* mutex = list_get(proceso_asociado->mutexs, i);
+                for (int j = 0; j < list_size(mutex->cola_bloqueados); j++) {
+                    TCB* hilo_bloqueado = list_get(mutex->cola_bloqueados, j);
+                    if (hilo_bloqueado->PID == hilo->PID && hilo_bloqueado->TID == hilo->TID) {
+                        // Liberar el TCB del hilo bloqueado
+                        liberar_TCB(hilo_bloqueado);
+                        // Remover de la lista de bloqueados
+                        list_remove_and_destroy_element(mutex->cola_bloqueados, j, free);
                         break;
                     }
                 }
-                // Si encontramos la cola con la prioridad correcta, removemos el hilo de esa cola
-                if (cola_encontrada != NULL) {
-                    list_remove_element(cola_encontrada->cola, hilo);
-                }
-                pthread_mutex_unlock(&mutex_colas_multinivel);
-            } else {
-                pthread_mutex_lock(&mutex_cola_ready);
-                list_remove_element(cola_ready,hilo);
-                pthread_mutex_unlock(&mutex_cola_ready);
             }
             break;
-        case BLOCKED:
-            pthread_mutex_lock(&mutex_cola_blocked);
-            list_remove_element(cola_blocked,hilo);
-            pthread_mutex_unlock(&mutex_cola_blocked);
-
-            pthread_mutex_lock(&mutex_cola_io);
-            list_remove_element(cola_io,hilo);
-            pthread_mutex_unlock(&mutex_cola_io);
-            break;
     }
+
     free(hilo->archivo_pseudocodigo);
     free(hilo);
 }
 
-void mover_hilos_bloqueados_por_thread_join(TCB* hilo){
-    for (int i = 0; i < list_size(lista_joins); i++) {
-        t_join_wait* relacion = list_get(lista_joins, i);
+void mover_hilos_bloqueados_por_thread_join(TCB* hilo) {
+    pthread_mutex_lock(&mutex_cola_join_wait);
+    for (int i = 0; i < list_size(cola_joins); i++) {
+        t_join_wait* relacion = list_get(cola_joins, i);
+        
+        // Verificamos que coincidan el PID y el TID del hilo esperado
         if (relacion->pid == hilo->PID && relacion->tid_esperado == hilo->TID) {
-            // Encontramos un hilo que espera por este hilo
-            TCB* hilo_esperador = buscar_hilo_por_pid_tid(relacion->pid, relacion->tid_esperador);
+            TCB* hilo_esperador = relacion->tid_esperador;
 
             if (hilo_esperador != NULL) {
                 hilo_esperador->estado = READY;
-                agregar_a_ready(hilo_esperador);
+                agregar_a_ready(hilo_esperador);  // Movemos el hilo esperador a la cola de ready
             }
 
-            // Eliminamos la relación ya que el hilo esperado ha terminado
-            list_remove_and_destroy_element(lista_joins, i, free);
+            list_remove_and_destroy_element(cola_joins, i, free);
             i--;
         }
     }
+    pthread_mutex_unlock(&mutex_cola_join_wait);
 }
 
 void desbloquear_hilos_por_mutex(TCB* hilo) {
-    // Obtener el proceso al que pertenece el hilo
     PCB* proceso = obtener_proceso_por_pid(hilo->PID);
 
     // Recorrer la lista de mutex del proceso
@@ -233,13 +250,13 @@ void crear_mutex(char* nombre) {
     PCB* proceso = obtener_proceso_por_pid(hilo_en_exec->PID);
 
     t_mutex* nuevo_mutex = malloc(sizeof(t_mutex));
-    nuevo_mutex->nombre = nombre;   // Asignar un ID único
+    nuevo_mutex->nombre = nombre;  
     nuevo_mutex->cola_bloqueados = list_create();    // Asociar el mutex al proceso
 
     list_add(proceso->mutexs, nuevo_mutex);
 
     pthread_mutex_lock(&mutex_log);
-    log_info(logger, "Mutex con nombre %s creado para el proceso %d\n", nombre, proceso->PID);
+    log_info(logger, "Mutex %s creado para el proceso %d\n", nombre, proceso->PID);
     pthread_mutex_unlock(&mutex_log);
 }
 
@@ -256,18 +273,14 @@ void lockear_mutex(char* nombre) {
             break;
         }
     }
-    if (mutex == NULL) {
-        printf("Error: Mutex con nombre '%s' no encontrado en el proceso PID: %d\n", nombre, hilo_en_exec->PID);
-        return;
-    }
     if (mutex->TID == NULL) {// El mutex está libre,
         mutex->TID = hilo_en_exec->TID;
         pthread_mutex_lock(&mutex_log);
-        log_info(logger, "Mutex '%s' asignado al hilo TID: %d\n", nombre, hilo_en_exec->TID);
+        log_info(logger, "Mutex '%s' asignado al hilo TID: %d del proceso %d\n", nombre, hilo_en_exec->TID,hilo_en_exec->PID);
         pthread_mutex_unlock(&mutex_log);
     } else {
         pthread_mutex_lock(&mutex_log);
-        log_info(logger, "Mutex '%s' está ocupado, bloqueando hilo TID: %d\n", nombre, hilo_en_exec->TID);
+        log_info(logger, "Mutex '%s' está ocupado, bloqueando hilo TID: %d del proceso %d\n", nombre, hilo_en_exec->TID,hilo_en_exec->PID);
         pthread_mutex_unlock(&mutex_log);
         
         // Agregar el hilo en ejecución a la cola de bloqueados del mutex
@@ -276,6 +289,8 @@ void lockear_mutex(char* nombre) {
         pthread_mutex_lock(&mutex_hilo_exec);
         hilo_en_exec=NULL;
         pthread_mutex_unlock(&mutex_hilo_exec);
+
+        sem_post(&hay_hilos_en_ready);
     }
 }
 
@@ -289,11 +304,6 @@ void unlockear_mutex(char* nombre) {
             break;
         }
     }
-    if (mutex == NULL) {
-        printf("Error: Mutex con nombre '%s' no encontrado en el proceso PID: %d\n", nombre, proceso->PID);
-        return;
-    }
-
     // Verificar si el mutex está tomado por el hilo en ejecución
     if (mutex->TID != hilo_en_exec->TID) {
         pthread_mutex_lock(&mutex_log);
@@ -306,8 +316,6 @@ void unlockear_mutex(char* nombre) {
 
         // Asignar el mutex al hilo desbloqueado
         mutex->TID = hilo_desbloqueado->TID;
-
-        // Cambiar el estado del hilo a "READY" (dependiendo de tu implementación)
         hilo_desbloqueado->estado =READY;
         agregar_a_ready(hilo_desbloqueado);
 
@@ -315,8 +323,8 @@ void unlockear_mutex(char* nombre) {
         log_info(logger, "Mutex '%s' reasignado al hilo TID: %d\n", nombre, hilo_desbloqueado->TID);
         pthread_mutex_unlock(&mutex_log);
     } else {
-        // No hay hilos bloqueados, liberar el mutex
-        mutex->TID == NULL;  // Liberar el mutex (o valor que indique que está libre)
+        // No hay hilos bloqueados, libero el mutex
+        mutex->TID == NULL; 
 
         pthread_mutex_lock(&mutex_log);
         log_info(logger, "Mutex '%s' liberado por el hilo TID: %d\n", nombre, hilo_en_exec->TID);
@@ -384,7 +392,6 @@ int informar_finalizacion_hilo_a_memoria(int pid, int tid){
     return respuesta;
 }
 
-
 /// FUNCIONES AUXILIARES ///
 bool buscar_por_pid(void* proceso) {
     PCB* un_proceso = (PCB*) proceso;
@@ -402,52 +409,68 @@ bool es_hilo_del_proceso(void* hilo, void* pid_proceso) {
     return un_hilo->PID == pid;
 }
 
+bool remover_hilo_de_cola(t_list* cola, int pid, int tid, pthread_mutex_t* mutex) {
+    bool encontrado = false;
+
+    pthread_mutex_lock(mutex);
+    for (int i = 0; i < list_size(cola); i++) {
+        TCB* hilo = list_get(cola, i);
+        if (hilo->PID == pid && hilo->TID == tid) {
+            liberar_TCB(hilo);
+            list_remove_and_destroy_element(cola, i, free);
+            encontrado = true;
+            break;
+        }
+    }
+    pthread_mutex_unlock(mutex);
+    
+    return encontrado;
+}
+
 void eliminar_hilos_asociados(PCB* proceso) {
-    // Iteramos sobre la lista de TIDs de los hilos asociados al proceso
     for (int i = 0; i < list_size(proceso->TIDs); i++) {
         int tid_a_buscar = list_get(proceso->TIDs, i);
         int pid_a_buscar = proceso->PID; 
-        TCB* hilo;
-        // Buscar el hilo en cola_ready_multinivel
+        bool encontrado = false;
+
+        // Buscar en colas_ready
         if (ALGORITMO_PLANIFICACION == COLAS_MULTINIVEL) {
-            pthread_mutex_lock(&mutex_colas_multinivel);
             for (int j = 0; j < list_size(cola_ready_multinivel); j++) {
                 t_cola_multinivel* cola_actual = list_get(cola_ready_multinivel, j);
-                hilo = buscar_hilo_en_cola_por_pid_tid(cola_actual->cola, pid_a_buscar, tid_a_buscar);
-                if (hilo != NULL) {
-                    liberar_TCB(hilo);
+                if (remover_hilo_de_cola(cola_actual->cola, pid_a_buscar, tid_a_buscar, &mutex_colas_multinivel)) {
+                    encontrado = true;
                     break;
                 }
             }
-            pthread_mutex_unlock(&mutex_colas_multinivel);
-            if (hilo != NULL) continue;
-        }else{
-            pthread_mutex_lock(&mutex_cola_ready);
-            TCB* hilo = buscar_hilo_en_cola_por_pid_tid(cola_ready, pid_a_buscar, tid_a_buscar);
-            if (hilo != NULL) {
-                liberar_TCB(hilo);
-                continue;
+        } else {
+            encontrado = remover_hilo_de_cola(cola_ready, pid_a_buscar, tid_a_buscar, &mutex_cola_ready);
+        }
+
+        if (encontrado) continue;
+
+        // Buscar en cola_io
+        encontrado = remover_hilo_de_cola(cola_io, pid_a_buscar, tid_a_buscar, &mutex_cola_io);
+        if (encontrado) continue;
+
+        // Buscar en cola_joins
+        pthread_mutex_lock(&mutex_cola_join_wait);
+        for (int j = 0; j < list_size(cola_joins); j++) {
+            t_join_wait* relacion = list_get(cola_joins, j);
+            if (relacion->pid == pid_a_buscar && relacion->tid_esperador->TID == tid_a_buscar) {
+                liberar_TCB(relacion->tid_esperador);
+                list_remove_and_destroy_element(cola_joins, j, free);
+                encontrado = true;
+                break;
             }
-            pthread_mutex_unlock(&mutex_cola_ready);
         }
+        pthread_mutex_unlock(&mutex_cola_join_wait);
+        if (encontrado) continue;
 
-        // Buscar el hilo en cola_blocked
-        pthread_mutex_lock(&mutex_cola_blocked);
-        hilo = buscar_hilo_en_cola_por_pid_tid(cola_blocked, pid_a_buscar, tid_a_buscar);
-        if (hilo != NULL) {
-            liberar_TCB(hilo);
-            continue;
+        // Buscar en los mutex del proceso
+        for (int j = 0; j < list_size(proceso->mutexs); j++) {
+            t_mutex* mutex = list_get(proceso->mutexs, j);
+            remover_hilo_de_cola(mutex->cola_bloqueados, pid_a_buscar, tid_a_buscar, NULL);
         }
-        pthread_mutex_unlock(&mutex_cola_blocked);
-
-        // Buscar el hilo en cola_io
-        pthread_mutex_lock(&mutex_cola_io);
-        hilo = buscar_hilo_en_cola_por_pid_tid(cola_io, pid_a_buscar, tid_a_buscar);
-        if (hilo != NULL) {
-            liberar_TCB(hilo);
-            continue;
-        }
-        pthread_mutex_unlock(&mutex_cola_io);
     }
 }
 
@@ -456,7 +479,7 @@ TCB* buscar_hilo_por_pid_tid(int pid_a_buscar, int tid_a_buscar) {
     // Dependiendo del estado del hilo, buscamos en la cola correspondiente
     switch (hilo->estado) {
         case READY:
-            if (ALGORITMO_PLANIFICACION == COLAS_MULTINIVEL){
+            if (ALGORITMO_PLANIFICACION == COLAS_MULTINIVEL) {
                 pthread_mutex_lock(&mutex_colas_multinivel);
                 for (int i = 0; i < list_size(cola_ready_multinivel); i++) {
                     t_cola_multinivel* cola_actual = list_get(cola_ready_multinivel, i);
@@ -467,25 +490,51 @@ TCB* buscar_hilo_por_pid_tid(int pid_a_buscar, int tid_a_buscar) {
                     }
                 }
                 pthread_mutex_unlock(&mutex_colas_multinivel);
-                break;
-            }else{
+            } else {
                 pthread_mutex_lock(&mutex_cola_ready);
                 hilo = buscar_en_cola(cola_ready, pid_a_buscar, tid_a_buscar);
                 pthread_mutex_unlock(&mutex_cola_ready);
                 return hilo;
             }
-        case BLOCKED:
-            // Primero buscar en cola_blocked
-            pthread_mutex_lock(&mutex_cola_blocked);
-            hilo = buscar_en_cola(cola_blocked, pid_a_buscar, tid_a_buscar);
-            pthread_mutex_unlock(&mutex_cola_blocked);
-            if (hilo != NULL) {
+            break;
+
+        case BLOCKED_IO:
+            pthread_mutex_lock(&mutex_cola_io);
+            hilo = buscar_en_cola(cola_io, pid_a_buscar, tid_a_buscar);
+            pthread_mutex_unlock(&mutex_cola_io);
+            return hilo;
+            break;
+
+        case BLOCKED_TJ:
+            // Buscar en la lista de joins (hilos bloqueados esperando otro hilo)
+            pthread_mutex_lock(&mutex_cola_join_wait);
+            for (int i = 0; i < list_size(cola_joins); i++) {
+                t_join_wait* join_wait = list_get(cola_joins, i);
+                if (join_wait->pid == pid_a_buscar && join_wait->tid_esperador->TID == tid_a_buscar) {
+                    hilo = join_wait->tid_esperador;
+                    pthread_mutex_unlock(&mutex_cola_join_wait);
+                    return hilo;
+                }
+            }
+            pthread_mutex_unlock(&mutex_cola_join_wait);
+            return NULL;
+            break;
+
+        case BLOCKED_MUTEX:
+            pthread_mutex_lock(&mutex_procesos_sistema);
+            PCB* proceso_asociado = obtener_proceso_por_pid(pid_a_buscar);
+            // Recorrer todos los mutex y buscar en sus colas de bloqueados
+            for (int j = 0; j < list_size(proceso_asociado->mutexs); j++) {
+                t_mutex* mutex = list_get(proceso_asociado->mutexs, j);
+                TCB* hilo = buscar_en_cola(mutex->cola_bloqueados, pid_a_buscar, tid_a_buscar);
                 return hilo;
             }
+            break;
         default:
-            return NULL; // Si el estado no es reconocido o no se encuentra el hilo
+            break;
     }
-    return NULL; // Si no se encuentra el hilo en ninguna cola
+
+    return NULL;  // Si no encuentra el hilo, devuelve NULL
 }
 
 TCB* buscar_en_cola(t_list* cola, int pid_a_buscar, int tid_a_buscar) {
@@ -496,16 +545,6 @@ TCB* buscar_en_cola(t_list* cola, int pid_a_buscar, int tid_a_buscar) {
         }
     }
     return NULL;
-}
-
-TCB* buscar_hilo_en_cola_por_pid_tid(t_list* cola, int pid_a_buscar, int tid_a_buscar) {
-    for (int i = 0; i < list_size(cola); i++) {
-        TCB* hilo = list_get(cola, i);
-        if (hilo->PID == pid_a_buscar && hilo->TID == tid_a_buscar) {
-            return hilo;
-        }
-    }
-    return NULL;  // Si no se encontró el hilo
 }
 
 int obtener_numero_proximo_hilo(PCB* proceso) {
