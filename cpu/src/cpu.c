@@ -100,3 +100,103 @@ void terminar_programa(){
 	log_destroy(logger_obligatorio);
 	config_destroy(config);
 }
+
+/*
+CPU_Registers registers;
+
+typedef enum {
+    SET, SUM, SUB, READ_MEM, WRITE_MEM, LOG_REG, MUTEX_CREATE, MUTEX_LOCK, MUTEX_UNLOCK, PROCESS_CREATE, THREAD_CREATE
+} Instruction;
+
+void cpu_cycle() {
+    while (1) {
+        fetch();        // Obtener la siguiente instrucción de la memoria
+        decode();       // Decodificar la instrucción
+        execute();      // Ejecutar la instrucción
+        check_interrupt(); // Verificar si hay interrupciones del Kernel
+    }
+}
+
+void fetch() {
+    log_info(logger, "FETCH - Solicitando instrucción en PC=%d", registers.PC);
+
+    // Enviar solicitud de instrucción a Memoria
+    send(memory_socket, &registers.PC, sizeof(registers.PC), 0);
+    
+    // Recibir la instrucción desde Memoria
+    Instruction instruction;
+    recv(memory_socket, &instruction, sizeof(Instruction), 0);
+
+    log_info(logger, "Instrucción recibida: %d", instruction);
+    
+    // Actualizar el PC para la siguiente instrucción
+    registers.PC++;
+}
+
+void decode() {
+    log_info(logger, "DECODE - Decodificando instrucción...");
+    // Aquí se puede manejar la lógica de decodificación
+}
+
+// Execute: Ejecutar la instrucción decodificada
+void execute() {
+    Instruction instruction;
+    recv(memory_socket, &instruction, sizeof(Instruction), 0);
+
+    switch (instruction) {
+        case SET:
+            registers.AX = 10; // Ejemplo de SET
+            log_info(logger, "SET AX = 10");
+            break;
+        case SUM:
+            registers.AX += registers.BX; // Ejemplo de SUM
+            log_info(logger, "SUM AX = AX + BX");
+            break;
+        case SUB:
+            registers.AX -= registers.BX; // Ejemplo de SUB
+            log_info(logger, "SUB AX = AX - BX");
+            break;
+        case READ_MEM:
+            // Enviar solicitud de lectura a Memoria
+            uint32_t address = registers.AX;
+            send(memory_socket, &address, sizeof(address), 0);
+            
+            // Recibir valor desde Memoria
+            uint32_t value;
+            recv(memory_socket, &value, sizeof(value), 0);
+            registers.BX = value; // Almacenar en BX
+            log_info(logger, "READ_MEM - Dirección: %d, Valor: %d", address, value);
+            break;
+        case WRITE_MEM:
+            // Escribir en Memoria
+            uint32_t address_to_write = registers.AX;
+            uint32_t value_to_write = registers.BX;
+            send(memory_socket, &address_to_write, sizeof(address_to_write), 0);
+            send(memory_socket, &value_to_write, sizeof(value_to_write), 0);
+            log_info(logger, "WRITE_MEM - Dirección: %d, Valor: %d", address_to_write, value_to_write);
+            break;
+        case PROCESS_CREATE:
+            log_info(logger, "Syscall PROCESS_CREATE - Notificando al Kernel");
+            send(kernel_socket, &instruction, sizeof(instruction), 0);
+            break;
+        case MUTEX_LOCK:
+            log_info(logger, "Syscall MUTEX_LOCK - Notificando al Kernel");
+            send(kernel_socket, &instruction, sizeof(instruction), 0);
+            break;
+        default:
+            log_warning(logger, "Instrucción no reconocida");
+            break;
+    }
+}
+
+
+void check_interrupt() {
+    int interrupt_signal;
+    recv(kernel_socket, &interrupt_signal, sizeof(int), MSG_DONTWAIT); // Leer sin bloquear
+
+    if (interrupt_signal > 0) {
+        log_info(logger, "Interrupción recibida: %d", interrupt_signal);
+        // Procesar la interrupción (ej. cambiar de contexto)
+    }
+}
+*/

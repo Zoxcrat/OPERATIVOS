@@ -31,6 +31,21 @@ char* IP_MEMORIA;
 char* PUERTO_MEMORIA;
 t_log_level LOG_LEVEL;
 
+//definir registros de la CPU
+typedef struct {
+    uint32_t PC; // Program Counter
+    uint32_t AX,BX,CX,DX,EX, FX, GX, HX;  // Registros generales
+} CPU_Registers;
+
+// Funciones principales del ciclo de instrucción
+
+void ciclo_cpu();
+void fetch();
+void decode();
+void execute();
+void check_interrupt();
+
+
 // INIT
 void leer_config();
 void* manejar_cliente_dispatch(void* socket_cliente);
