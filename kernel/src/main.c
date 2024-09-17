@@ -185,9 +185,9 @@ void procesar_conexion_cpu_dispatch() {
                 log_info(logger_obligatorio, "## (%d:%d) - Solicitó syscall: PROCESS_CREATE", hilo_en_exec->PID,hilo_en_exec->TID);
                 pthread_mutex_unlock(&mutex_log);
 
-                crear_proceso(syscall_data->parametro1, syscall_data->parametro2, syscall_data->parametro3);
-                free(syscall_data->nombre_archivo_pseudocodigo);
-                free(syscall_data);
+                crear_proceso(syscall->parametro1, atoi(syscall->parametro2), atoi(syscall->parametro3));
+                free(syscall->parametro1);
+                free(syscall);
             }
             case PROCESS_EXIT: {
                 pthread_mutex_lock(&mutex_log);
@@ -203,17 +203,14 @@ void procesar_conexion_cpu_dispatch() {
                 log_info(logger_obligatorio, "## (%d:%d) - Solicitó syscall: THREAD_CREATE", hilo_en_exec->PID,hilo_en_exec->TID);
                 pthread_mutex_unlock(&mutex_log);
 
-                t_instruccion_thread_create* syscall_data = malloc(sizeof(t_instruccion_thread_create));
-                if (recv(fd_cpu_dispatch, &syscall_data, sizeof(t_instruccion_thread_create), MSG_WAITALL) > 0) {
-                    pthread_mutex_lock(&mutex_procesos_sistema);
-                    PCB* proceso_asociado = obtener_proceso_por_pid(hilo_en_exec->PID);
-                    pthread_mutex_lock(&mutex_procesos_sistema);
+                pthread_mutex_lock(&mutex_procesos_sistema);
+                PCB* proceso_asociado = obtener_proceso_por_pid(hilo_en_exec->PID);
+                pthread_mutex_lock(&mutex_procesos_sistema);
 
-                    crear_hilo(proceso_asociado, syscall_data->prioridad, syscall_data->nombre_archivo_pseudocodigo);
+                crear_hilo(proceso_asociado, atoi(syscall->parametro2), syscall->parametro1);
 
-                    free(syscall_data->nombre_archivo_pseudocodigo);
-                    free(syscall_data);
-                }
+                free(syscall->parametro1);
+                free(syscall);
                 break;
             }
             case THREAD_JOIN: {
@@ -221,24 +218,20 @@ void procesar_conexion_cpu_dispatch() {
                 log_info(logger_obligatorio, "## (%d:%d) - Solicitó syscall: THREAD_JOIN", hilo_en_exec->PID,hilo_en_exec->TID);
                 pthread_mutex_unlock(&mutex_log);
 
+                pthread_mutex_lock(&mutex_procesos_sistema);
+                PCB* proceso_asociado = obtener_proceso_por_pid(hilo_en_exec->PID);
+                pthread_mutex_unlock(&mutex_procesos_sistema);
 
-                int TID;
-                if (recv(fd_cpu_dispatch, &TID, sizeof(int), MSG_WAITALL) > 0) {
-                    pthread_mutex_lock(&mutex_procesos_sistema);
-                    PCB* proceso_asociado = obtener_proceso_por_pid(hilo_en_exec->PID);
-                    pthread_mutex_unlock(&mutex_procesos_sistema);
+                TCB* hilo_asociado = buscar_hilo_por_pid_tid(proceso_asociado->PID, atoi(syscall->parametro1));
 
-                    TCB* hilo_asociado = buscar_hilo_por_pid_tid(proceso_asociado->PID, TID);
-
-                    if (hilo_asociado != NULL) {
-                        manejar_thread_join(TID);
-                        sem_post(&hay_hilos_en_ready);
-                    } else {
-                        // Si el hilo con el TID no existe o ya ha terminado, no hacer nada
-                        pthread_mutex_lock(&mutex_log);
-                        log_info(logger, "Hilo %d del proceso %d no existe o ya ha terminado, el hilo que invoca THREAD_JOIN continuará su ejecución",TID,proceso_asociado->PID);
-                        pthread_mutex_unlock(&mutex_log);
-                    }
+                if (hilo_asociado != NULL) {
+                    manejar_thread_join(atoi(syscall->parametro1));
+                    sem_post(&hay_hilos_en_ready);
+                } else {
+                    // Si el hilo con el TID no existe o ya ha terminado, no hacer nada
+                    pthread_mutex_lock(&mutex_log);
+                    log_info(logger, "Hilo %d del proceso %d no existe o ya ha terminado, el hilo que invoca THREAD_JOIN continuará su ejecución",atoi(syscall->parametro1),proceso_asociado->PID);
+                    pthread_mutex_unlock(&mutex_log);
                 }
                 break;
             }
@@ -247,14 +240,11 @@ void procesar_conexion_cpu_dispatch() {
                 pthread_mutex_lock(&mutex_log);
                 log_info(logger_obligatorio, "## (%d:%d) - Solicitó syscall: THREAD_CANCEL", hilo_en_exec->PID,hilo_en_exec->TID);
                 pthread_mutex_unlock(&mutex_log);
+                
+                TCB* hilo_requerido = buscar_hilo_por_pid_tid(hilo_en_exec->PID, atoi(syscall->parametro1));
 
-                int TID;
-                if (recv(fd_cpu_dispatch, &TID, sizeof(int), MSG_WAITALL) > 0) {
-                    TCB* hilo_requerido = buscar_hilo_por_pid_tid(hilo_en_exec->PID, TID);
-
-                    if(hilo_requerido != NULL){
-                        finalizar_hilo(hilo_en_exec->PID, TID);
-                    }
+                if(hilo_requerido != NULL){
+                    finalizar_hilo(hilo_en_exec->PID, atoi(syscall->parametro1));
                 }
                 break;
             }
@@ -271,12 +261,8 @@ void procesar_conexion_cpu_dispatch() {
                 log_info(logger_obligatorio, "## (%d:%d) - Solicitó syscall: MUTEX_CREATE", hilo_en_exec->PID,hilo_en_exec->TID);
                 pthread_mutex_unlock(&mutex_log);
 
-
-                char* nombre_mutex = malloc(sizeof(char*));
-                if (recv(fd_cpu_dispatch, &nombre_mutex, sizeof(char*), MSG_WAITALL) > 0) {
-                    crear_mutex(nombre_mutex);
-                    free(nombre_mutex);
-                }
+                crear_mutex(syscall->parametro1);
+                free(syscall->parametro1);
                 break;
             }
             case MUTEX_LOCK: {
@@ -284,11 +270,8 @@ void procesar_conexion_cpu_dispatch() {
                 log_info(logger_obligatorio, "## (%d:%d) - Solicitó syscall: MUTEX_LOCK", hilo_en_exec->PID,hilo_en_exec->TID);
                 pthread_mutex_unlock(&mutex_log);
 
-                char* nombre_mutex = malloc(sizeof(char*));
-                if (recv(fd_cpu_dispatch, &nombre_mutex, sizeof(char*), MSG_WAITALL) > 0) {
-                    lockear_mutex(nombre_mutex);
-                    free(nombre_mutex);
-                }
+                lockear_mutex(syscall->parametro1);
+                free(syscall->parametro1);
                 break;
             }
             case MUTEX_UNLOCK: {
@@ -296,12 +279,8 @@ void procesar_conexion_cpu_dispatch() {
                 log_info(logger_obligatorio, "## (%d:%d) - Solicitó syscall: MUTEX_UNLOCK", hilo_en_exec->PID,hilo_en_exec->TID);
                 pthread_mutex_unlock(&mutex_log);
 
-
-                char* nombre_mutex = malloc(sizeof(char*));
-                if (recv(fd_cpu_dispatch, &nombre_mutex, sizeof(char*), MSG_WAITALL) > 0) {
-                    unlockear_mutex(nombre_mutex);
-                    free(nombre_mutex);
-                }
+                unlockear_mutex(syscall->parametro1);
+                free(syscall->parametro1);
                 break;
             }
             case DUMP_MEMORY: {
@@ -333,30 +312,27 @@ void procesar_conexion_cpu_dispatch() {
                 log_info(logger_obligatorio, "## (%d:%d) - Solicitó syscall: IO", hilo_en_exec->PID,hilo_en_exec->TID);
                 pthread_mutex_unlock(&mutex_log);
 
-                int tiempo_IO_milisegundos;
-                if (recv(fd_cpu_dispatch, &tiempo_IO_milisegundos, sizeof(int), MSG_WAITALL) > 0){
-                    hilo_desalojado = true;
-                    pthread_mutex_lock(&mutex_log);
-                    log_info(logger_obligatorio, "## (%d:%d) - Bloqueado por: IO", hilo_en_exec->PID,hilo_en_exec->TID);
-                    pthread_mutex_unlock(&mutex_log);
+                hilo_desalojado = true;
+                pthread_mutex_lock(&mutex_log);
+                log_info(logger_obligatorio, "## (%d:%d) - Bloqueado por: IO", hilo_en_exec->PID,hilo_en_exec->TID);
+                pthread_mutex_unlock(&mutex_log);
 
-                    pthread_mutex_lock(&mutex_hilo_exec);
-                    TCB* hilo = hilo_en_exec;
-                    hilo->tiempo_bloqueo_io = tiempo_IO_milisegundos;
-                    hilo->estado = BLOCKED_IO;
-                    pthread_mutex_unlock(&mutex_hilo_exec);
-                    
-                    pthread_mutex_lock(&mutex_cola_io);
-                    list_add(cola_io,hilo);
-                    pthread_mutex_unlock(&mutex_cola_io);
-                    
-                    pthread_mutex_lock(&mutex_hilo_exec);
-                    hilo_en_exec = NULL;
-                    pthread_mutex_unlock(&mutex_hilo_exec);
+                pthread_mutex_lock(&mutex_hilo_exec);
+                TCB* hilo = hilo_en_exec;
+                hilo->tiempo_bloqueo_io = atoi(syscall->parametro1);
+                hilo->estado = BLOCKED_IO;
+                pthread_mutex_unlock(&mutex_hilo_exec);
+                
+                pthread_mutex_lock(&mutex_cola_io);
+                list_add(cola_io,hilo);
+                pthread_mutex_unlock(&mutex_cola_io);
+                
+                pthread_mutex_lock(&mutex_hilo_exec);
+                hilo_en_exec = NULL;
+                pthread_mutex_unlock(&mutex_hilo_exec);
 
-                    sem_post(&hay_hilos_en_io);
-                    sem_post(&mandar_interrupcion);
-                }
+                sem_post(&hay_hilos_en_io);
+                sem_post(&mandar_interrupcion);
             }
             default: {
                 log_error(logger, "Código de syscall no reconocido");
