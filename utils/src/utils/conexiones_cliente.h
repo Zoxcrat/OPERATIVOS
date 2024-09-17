@@ -19,11 +19,19 @@ typedef enum
 	CREACION_HILO,
 	FINALIZACION_HILO,
 	EJECUTAR_HILO,
-	HACER_DUMP
+	HACER_DUMP,
+	PEDIDO_CONTEXTO
 }op_code;
 
 typedef enum
 {
+	SET,
+	READ_MEM, 
+	WRITE_MEM, 
+	SUM, 
+	SUB, 
+	JNZ, 
+	LOG,
 	PROCESS_CREATE,
 	PROCESS_EXIT,
 	THREAD_CREATE,
@@ -35,7 +43,15 @@ typedef enum
 	MUTEX_UNLOCK,
 	DUMP_MEMORY,
 	IO
-}t_syscall;
+}t_instruccion;
+
+typedef struct t_instruccion{
+    t_instruccion instruccion;
+    char* parametro1;
+    char* parametro2;
+    char* parametro3;
+} t_instruccion_completa;
+
 
 typedef struct {
     char* nombre_archivo_pseudocodigo;

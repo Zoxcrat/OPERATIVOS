@@ -117,8 +117,8 @@ void enviar_hilo_a_cpu(TCB* hilo)
 
     // Crear un paquete para enviar el TID y PID al módulo de CPU (dispatch)
     t_paquete* paquete = crear_paquete();
-    agregar_a_paquete(paquete, &(hilo->TID), sizeof(int));
     agregar_a_paquete(paquete, &(hilo->PID), sizeof(int));
+    agregar_a_paquete(paquete, &(hilo->TID), sizeof(int));
     enviar_peticion(paquete, fd_cpu_dispatch, EJECUTAR_HILO);
     eliminar_paquete(paquete);
 

@@ -167,10 +167,10 @@ bool generar_conexiones(){
 
 void procesar_conexion_cpu_dispatch() {
     while (1) {
-        t_syscall codigo_syscall;
+        t_instruccion_completa* syscall;
         
         // Recibir el código de la syscall
-        if (recv(fd_cpu_dispatch, &codigo_syscall, sizeof(t_syscall), MSG_WAITALL) <= 0) {
+        if (recv(fd_cpu_dispatch, &syscall, sizeof(t_instruccion_completa), MSG_WAITALL) <= 0) {
             pthread_mutex_lock(&mutex_log);
             log_error(logger, "No se pudo recibir la syscall de la CPU");
             pthread_mutex_unlock(&mutex_log);
@@ -179,20 +179,15 @@ void procesar_conexion_cpu_dispatch() {
         }
 
         // Procesar la syscall según el código recibido
-        switch (codigo_syscall) {
+        switch (syscall->instruccion) {
             case PROCESS_CREATE: {
                 pthread_mutex_lock(&mutex_log);
                 log_info(logger_obligatorio, "## (%d:%d) - Solicitó syscall: PROCESS_CREATE", hilo_en_exec->PID,hilo_en_exec->TID);
                 pthread_mutex_unlock(&mutex_log);
 
-                t_syscall_process_create* syscall_data = malloc(sizeof(t_syscall_process_create));
-                // Recibir los parámetros específicos de PROCESS_CREATE
-                if (recv(fd_cpu_dispatch, &syscall_data, sizeof(t_syscall_process_create), MSG_WAITALL) > 0) {
-                    crear_proceso(syscall_data->nombre_archivo_pseudocodigo, syscall_data->tamano_proceso, syscall_data->prioridad_hilo_0);
-                    free(syscall_data->nombre_archivo_pseudocodigo);
-                    free(syscall_data);
-                }
-                break;
+                crear_proceso(syscall_data->parametro1, syscall_data->parametro2, syscall_data->parametro3);
+                free(syscall_data->nombre_archivo_pseudocodigo);
+                free(syscall_data);
             }
             case PROCESS_EXIT: {
                 pthread_mutex_lock(&mutex_log);
@@ -208,8 +203,8 @@ void procesar_conexion_cpu_dispatch() {
                 log_info(logger_obligatorio, "## (%d:%d) - Solicitó syscall: THREAD_CREATE", hilo_en_exec->PID,hilo_en_exec->TID);
                 pthread_mutex_unlock(&mutex_log);
 
-                t_syscall_thread_create* syscall_data = malloc(sizeof(t_syscall_thread_create));
-                if (recv(fd_cpu_dispatch, &syscall_data, sizeof(t_syscall_thread_create), MSG_WAITALL) > 0) {
+                t_instruccion_thread_create* syscall_data = malloc(sizeof(t_instruccion_thread_create));
+                if (recv(fd_cpu_dispatch, &syscall_data, sizeof(t_instruccion_thread_create), MSG_WAITALL) > 0) {
                     pthread_mutex_lock(&mutex_procesos_sistema);
                     PCB* proceso_asociado = obtener_proceso_por_pid(hilo_en_exec->PID);
                     pthread_mutex_lock(&mutex_procesos_sistema);
