@@ -13,6 +13,7 @@
 #include <commons/temporal.h>
 #include <commons/temporal.h>
 #include <pthread.h>
+#include <semaphore.h>
 
 char* IP_ESCUCHA;
 char* PUERTO_ESCUCHA_DISPATCH;

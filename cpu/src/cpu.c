@@ -17,7 +17,7 @@ int main(int argc, char **argv) {
 		exit(1);
 	}
 	leer_config();
-    inicializar_variables();
+    inicializar_estructuras();
 
     interrupt_socket = -1, dispatch_socket = -1,fd_memoria = -1;
 	if (!generar_conexiones()) {
@@ -66,9 +66,9 @@ void* manejar_cliente_dispatch() {
     while (1){
         t_list* paquete = recibir_paquete(cliente_socket_dispatch);
 
-        op_code codigo_opearacion = list_get(paquete, 0);  // Primer elemento es el PID
-        pid_actual = list_get(paquete, 1);  // Primer elemento es el PID
-        tid_actual = list_get(paquete, 2);  // Segundo elemento es el TID
+        op_code codigo_operacion = *(op_code*)list_get(paquete, 0);  // Primer elemento es el PID
+        pid_actual = *(int*)list_get(paquete, 1);
+        tid_actual = *(int*)list_get(paquete, 2);
 
         sem_post(&pedir_contexto);
     }
@@ -123,7 +123,9 @@ void cpu_cycle() {
         fetch();        // Obtener la siguiente instrucción de la memoria
         decode();       // Decodificar la instrucción
         execute();      // Ejecutar la instrucción
-        contexto->PC++;
+        if (instruccion_actual->instruccion != SET && strcmp(instruccion_actual->parametro1, "PC") != 0){
+            contexto->PC++;
+        }
         sem_post(&verificar_interrupcion); // Verificar si hay interrupciones del Kernel
     }
     log_info(logger, "Ciclo de CPU interrumpido");
@@ -145,7 +147,6 @@ void decode() {
 void execute() {
     switch (instruccion_actual->instruccion) {
         case SET:
-        uint32_t valor;
             uint32_t valor = (uint32_t) strtoul(instruccion_actual->parametro2, NULL, 5);
             set_valor_registro(instruccion_actual->parametro1, valor);
             break;
@@ -222,7 +223,7 @@ void traducir_direccion_logica_a_fisica(){
 
 }
 
-// MANEJO INSTRUCCIONES (COMPLETAR A MANO DESPUES)
+// MANEJO INSTRUCCIONES 
 void set_valor_registro(char* registro, uint32_t valor) {
     if (strcmp(registro, "PC") == 0) {
         contexto->PC = valor;
@@ -264,7 +265,6 @@ void set_valor_registro(char* registro, uint32_t valor) {
 
 void sumar_registros(char* destino, char* origen) {
     uint32_t valor_origen = 0;
-    uint32_t valor_destino = 0;
 
     // Obtener valor del registro origen
     if (strcmp(origen, "PC") == 0) {
@@ -335,7 +335,6 @@ void sumar_registros(char* destino, char* origen) {
 
 void restar_registros(char* destino, char* origen) {
     uint32_t valor_origen = 0;
-    uint32_t valor_destino = 0;
 
     // Obtener valor del registro origen
     if (strcmp(origen, "PC") == 0) {
