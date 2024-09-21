@@ -20,7 +20,9 @@ typedef enum
 	FINALIZACION_HILO,
 	EJECUTAR_HILO,
 	HACER_DUMP,
-	PEDIDO_CONTEXTO
+	PEDIDO_CONTEXTO,
+	ESCRIBIR_MEMORIA,
+	LEER_MEMORIA
 }op_code;
 
 typedef enum
@@ -42,7 +44,8 @@ typedef enum
 	MUTEX_LOCK,
 	MUTEX_UNLOCK,
 	DUMP_MEMORY,
-	IO
+	IO,
+	SEGMENTATION_FAULT
 }t_instruccion;
 
 typedef struct t_instruccion{

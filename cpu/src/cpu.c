@@ -121,7 +121,6 @@ void pedir_contexto_a_memoria() {
 void cpu_cycle() {
     while (interrupcion == 0) {
         fetch();        // Obtener la siguiente instrucción de la memoria
-        decode();       // Decodificar la instrucción
         execute();      // Ejecutar la instrucción
         if (instruccion_actual->instruccion != SET && strcmp(instruccion_actual->parametro1, "PC") != 0){
             contexto->PC++;
@@ -138,24 +137,50 @@ void fetch() {
     log_info(logger, "Instrucción recibida: %d", instruccion_actual->instruccion);
 }
 
-void decode() {
-    if(instruccion_actual->instruccion == READ_MEM || instruccion_actual->instruccion == WRITE_MEM) { //necesitan traduccion
-        traducir_direccion_logica_a_fisica();
-    }
-}
-
 void execute() {
     switch (instruccion_actual->instruccion) {
         case SET:
             uint32_t valor = (uint32_t) strtoul(instruccion_actual->parametro2, NULL, 5);
             set_valor_registro(instruccion_actual->parametro1, valor);
             break;
-        case READ_MEM:
+        case READ_MEM:{
+            int direccion_fis = traducir_direccion_logica_a_fisica(atoi(instruccion_actual->parametro2)); // DECODE
             log_info(logger, "READ MEM");
-            break;
-        case WRITE_MEM:
-            log_info(logger, "WRITE MEM");
-            break;
+            if (direccion_fis != -1) { // Verificar si no hubo segmentation fault
+                // Leer el valor desde la memoria física
+                uint32_t valor_leido = leer_memoria(direccion_fis);
+
+                // Asignar el valor leído al registro de datos
+                set_valor_registro(instruccion_actual->parametro1, valor_leido);
+
+                log_info(logger, "READ MEM: Leído valor %d desde la dirección física %d", valor_leido, direccion_fis);
+            } else {
+                free(instruccion_actual->parametro1);
+                free(instruccion_actual->parametro2);
+                free(instruccion_actual->parametro3);
+                instruccion_actual->instruccion = SEGMENTATION_FAULT;
+                send(dispatch_socket, &instruccion_actual, sizeof(t_instruccion_completa), 0);
+                free(instruccion_actual);
+                log_error(logger, "READ MEM: Segmentation Fault al intentar acceder a la dirección lógica %d", direccion_fis);
+            }
+            break;}
+        case WRITE_MEM:{
+            int direccion_fis = traducir_direccion_logica_a_fisica(atoi(instruccion_actual->parametro1)); // DECODE
+            
+            if (direccion_fis != -1) { // Verificar si no hubo segmentation fault
+                // EScribir el valor desde la memoria física
+                escribir_memoria(instruccion_actual->parametro2,direccion_fis);
+                log_info(logger, "READ MEM: Leído escrito en la dirección física %d", direccion_fis);
+            } else {
+                free(instruccion_actual->parametro1);
+                free(instruccion_actual->parametro2);
+                free(instruccion_actual->parametro3);
+                instruccion_actual->instruccion = SEGMENTATION_FAULT;
+                send(dispatch_socket, &instruccion_actual, sizeof(t_instruccion_completa), 0);
+                free(instruccion_actual);
+                log_error(logger, "READ MEM: Segmentation Fault al intentar acceder a la dirección lógica %d", direccion_fis);
+            }
+            break;}
         case SUM:
             sumar_registros(instruccion_actual->parametro1, instruccion_actual->parametro2);
             break;
@@ -218,9 +243,13 @@ void execute() {
     }
 }
 
-//// FALTA IMPLEMENTAR
-void traducir_direccion_logica_a_fisica(){
-
+int traducir_direccion_logica_a_fisica(int direccion_logica){
+    int direccion_fisica;
+    if (direccion_logica < 0 || direccion_logica >= contexto->limite){
+        return -1;
+        }
+    direccion_fisica = contexto->base + direccion_logica;
+    return direccion_fisica;
 }
 
 // MANEJO INSTRUCCIONES 
@@ -478,6 +507,28 @@ void log_registro(char* registro) {
     log_info(logger, "El valor del registro %s es %u", registro, valor_registro);
 }
 
+uint32_t leer_memoria(int direccion_fisica){
+    t_paquete* paquete = crear_paquete();
+    agregar_a_paquete(paquete, &direccion_fisica, sizeof(int));
+    enviar_peticion(paquete, fd_memoria, LEER_MEMORIA);
+    eliminar_paquete(paquete);
+
+    uint32_t valor_leido;
+    recv(fd_memoria, &valor_leido, sizeof(uint32_t), MSG_WAITALL);
+    return valor_leido;
+}
+
+void escribir_memoria(char* registro_datos,int direccion_fisica){
+    t_paquete* paquete = crear_paquete();
+    agregar_a_paquete(paquete, &registro_datos, sizeof(char));
+    agregar_a_paquete(paquete, &direccion_fisica, sizeof(int));
+    enviar_peticion(paquete, fd_memoria, ESCRIBIR_MEMORIA);
+    eliminar_paquete(paquete);
+
+    int respuesta;
+    recv(fd_memoria, &respuesta, sizeof(int), MSG_WAITALL);
+}
+
 // variables del programa
 
 void inicializar_estructuras()
@@ -492,6 +543,7 @@ void inicializar_estructuras()
     hilo_dispatch = malloc(sizeof(pthread_t));
     hilo_interrupt = malloc(sizeof(pthread_t));
 }
+
 void terminar_programa(){
 	log_destroy(logger);
 	log_destroy(logger_obligatorio);

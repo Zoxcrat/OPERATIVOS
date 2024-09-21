@@ -62,12 +62,14 @@ void cpu_cycle();
 void fetch();
 void decode();
 void execute();
-void traducir_direccion_logica_a_fisica();
+int traducir_direccion_logica_a_fisica(int direccion_logica);
 void set_valor_registro(char* registro, uint32_t valor);
 void sumar_registros(char* destino, char* origen);
 void restar_registros(char* destino, char* origen);
 void jnz_registro(char* registro, uint32_t instruccion);
 void log_registro(char* registro);
+uint32_t leer_memoria(int direccion_fisica);
+void escribir_memoria(char* registro_datos,int direccion_fisica);
 void inicializar_estructuras();
 void terminar_programa();
 
