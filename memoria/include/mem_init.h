@@ -7,5 +7,6 @@
  * Inicializa los logs, configs y crea el espacio de memoria.
  */
 int inicializar_memoria();
+void particionar_memoria();
 
 #endif /* INICIALIZAR_MEMORIA_ */

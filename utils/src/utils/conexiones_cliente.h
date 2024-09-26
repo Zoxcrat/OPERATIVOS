@@ -19,20 +19,23 @@ typedef enum
 	CREACION_HILO,
 	FINALIZACION_HILO,
 	EJECUTAR_HILO,
+	// MEMORIA
 	HACER_DUMP,
 	PEDIDO_CONTEXTO,
-	ESCRIBIR_MEMORIA,
-	LEER_MEMORIA
-}op_code;
+	ACTUALIZAR_CONTEXTO,
+	OBTENER_INSTRUCCION,
+	ESCRIBIR_MEMORIA, // WRITE MEM
+	LEER_MEMORIA	  // READ MEM
+} op_code;
 
 typedef enum
 {
 	SET,
-	READ_MEM, 
-	WRITE_MEM, 
-	SUM, 
-	SUB, 
-	JNZ, 
+	READ_MEM,
+	WRITE_MEM,
+	SUM,
+	SUB,
+	JNZ,
 	LOG,
 	PROCESS_CREATE,
 	PROCESS_EXIT,
@@ -46,37 +49,39 @@ typedef enum
 	DUMP_MEMORY,
 	IO,
 	SEGMENTATION_FAULT
-}t_instruccion;
+} t_instruccion;
 
-typedef struct t_instruccion{
-    t_instruccion instruccion;
-    char* parametro1;
-    char* parametro2;
-    char* parametro3;
+typedef struct t_instruccion
+{
+	t_instruccion instruccion;
+	char *parametro1;
+	char *parametro2;
+	char *parametro3;
 } t_instruccion_completa;
 
-
-typedef struct {
-    char* nombre_archivo_pseudocodigo;
-    int tamano_proceso;
-    int prioridad_hilo_0;
+typedef struct
+{
+	char *nombre_archivo_pseudocodigo;
+	int tamano_proceso;
+	int prioridad_hilo_0;
 } t_syscall_process_create;
 
-typedef struct {
-    char* nombre_archivo_pseudocodigo;
+typedef struct
+{
+	char *nombre_archivo_pseudocodigo;
 	int prioridad;
 } t_syscall_thread_create;
 
 typedef struct
 {
 	int size;
-	void* stream;
+	void *stream;
 } t_buffer;
 
 typedef struct
 {
 	op_code codigo_operacion;
-	t_buffer* buffer;
+	t_buffer *buffer;
 } t_paquete;
 
 /**
@@ -140,7 +145,7 @@ void enviar_entero(int valor, int socket_cliente);
 
 /**
  * Similar a crear_conexion, pero no envía un mensaje (para tener control sobre el handshake).
-*/
-int crear_conexion2(char *ip, char* puerto);
+ */
+int crear_conexion2(char *ip, char *puerto);
 
 #endif // !CONEXIONES_CLIENTE

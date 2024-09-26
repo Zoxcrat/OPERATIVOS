@@ -8,6 +8,8 @@ t_config *config;
 int socket_cliente;
 int memoria_socket;
 int fd_filesystem;
+int fd_cpu;
+int fd_kernel;
 
 // Variables del config (Las pongo aca asi no estamos revoleando el cfg para todos lados)
 
@@ -20,7 +22,7 @@ char *PATH_INSTRUCCIONES;
 int RETARDO_RESPUESTA;
 char *ESQUEMA;
 char *ALGORITMO_BUSQUEDA;
-char *PARTICIONES; // REVISAR
+char **PARTICIONES; // REVISAR
 t_log_level LOG_LEVEL;
 
 // Variables de memoria

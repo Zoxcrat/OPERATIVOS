@@ -8,6 +8,8 @@ int main(int argc, char **argv)
     }
 
     inicializar_memoria();
+    asignar_memoria(13);
+    asignar_memoria(13);
 
     leer_archivo_pseudocodigo("prueba.txt");
 
@@ -16,31 +18,57 @@ int main(int argc, char **argv)
     if (fd_filesystem == -1)
     {
         log_error(logger, "Error al conectar con el módulo FILESYSEM");
-        return EXIT_FAILURE;
+        // return EXIT_FAILURE;
     }
 
-    // Esperar conexión del módulo CPU
-    int fd_cpu = esperar_cliente(memoria_socket, logger);
-    if (fd_cpu == -1)
+    int fd_cliente;
+    for (int i = 0; i < 3; i++)
     {
-        log_error(logger, "Error al conectar con el módulo CPU");
-        return EXIT_FAILURE;
-    }
-    else{
-	log_info(logger, "Conexión con CPU establecida");
-	
-    }
-    while (1) {
-        pthread_t hilo_cliente;
-        int socket_cliente = esperar_cliente(memoria_socket, logger);
-        if (socket_cliente == -1)
+        log_info(logger, "Esperando Clientes...");
+        fd_cliente = esperar_cliente(memoria_socket, logger);
+
+        int cod_op = recibir_operacion(fd_cliente);
+        switch (cod_op)
         {
-            log_info(logger, "Hubo un error en la conexión del cliente");
-            continue;
+        case KERNEL:
+            log_info(logger, "Se conecto el KERNEL");
+            fd_kernel = fd_cliente;
+            atender_kernel();
+            break;
+        case CPU:
+            log_info(logger, "Se conecto la CPU");
+            fd_cpu = fd_cliente;
+            atender_cpu();
+            break;
+        default:
+            log_error(logger, "No reconozco ese codigo");
+            break;
         }
-        pthread_create(&hilo_cliente, NULL, (void *)procesar_conexion, (void *)(intptr_t)socket_cliente);
-        pthread_detach(hilo_cliente);
     }
+    // Esperar conexión del módulo CPU
+    /*     int fd_cpu = esperar_cliente(memoria_socket, logger);
+        if (fd_cpu == -1)
+        {
+            log_error(logger, "Error al conectar con el módulo CPU");
+            // return EXIT_FAILURE;
+        }
+        else
+        {
+            log_info(logger, "Conexión con CPU establecida");
+        }
+        while (1)
+        {
+            pthread_t hilo_cliente;
+            int socket_cliente = esperar_cliente(memoria_socket, logger);
+            if (socket_cliente == -1)
+            {
+                log_info(logger, "Hubo un error en la conexión del cliente");
+                continue;
+            }
+            pthread_create(&hilo_cliente, NULL, (void *)procesar_conexion, (void *)(intptr_t)socket_cliente);
+            pthread_detach(hilo_cliente);
+        } */
+
     terminar_programa();
     return 0;
 }

@@ -17,12 +17,10 @@ t_list *leer_archivo_pseudocodigo(char *archivo_a_leer)
     char lineaActual[100];
     while (fgets(lineaActual, sizeof(lineaActual), archivo) != NULL)
     {
-        printf("Instruccion: %s", lineaActual);
+        // printf("Instruccion: %s", lineaActual);
         list_add(lista_instrucciones, lineaActual);
     }
 
-    list_iterate(lista_particiones, (void *)printf);
-
     fclose(archivo);
-    return ruta_completa;
+    return lista_instrucciones;
 }

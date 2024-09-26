@@ -45,6 +45,15 @@ int recibir_operacion(int socket_cliente)
         return -1;
     }
 }
+
+int recibir_entero(int socket)
+{
+
+    int *recibido = malloc(sizeof(int)); // antes : int* recibido;
+    recv(socket, recibido, sizeof(int), MSG_WAITALL);
+    return *recibido; // antes return *recibido
+}
+
 void *recibir_buffer(int *size, int socket_cliente)
 {
     void *buffer;

@@ -16,8 +16,10 @@ int inicializar_memoria()
     }
     leer_config();
 
+    // Creo la memoria y la particiono segun el esquema que se indique.
     memoria_usuario = malloc(TAM_MEMORIA);
     lista_particiones = list_create();
+    particionar_memoria();
 
     // Inicializar servidor de Memoria
     memoria_socket = iniciar_servidor(logger, IP_ESCUCHA, PUERTO_ESCUCHA);
@@ -26,6 +28,7 @@ int inicializar_memoria()
         log_error(logger, "Error al iniciar el servidor de la memoria");
         return EXIT_FAILURE;
     }
+
     return EXIT_SUCCESS;
 }
 
@@ -40,7 +43,32 @@ void leer_config()
     RETARDO_RESPUESTA = config_get_int_value(config, "RETARDO_RESPUESTA");
     ESQUEMA = config_get_string_value(config, "ESQUEMA");
     ALGORITMO_BUSQUEDA = config_get_string_value(config, "ALGORITMO_BUSQUEDA");
-    PARTICIONES = config_get_string_value(config, "PARTICIONES"); // REVISAR
+    PARTICIONES = config_get_array_value(config, "PARTICIONES");
     char *log_level = config_get_string_value(config, "LOG_LEVEL");
     LOG_LEVEL = log_level_from_string(log_level);
+}
+
+void particionar_memoria()
+{
+    // Solamente tengo que tomarme el trabajo de crear las particiones si el esquema es Fijo. En cualquier otro caso, la complejidad viene al asignar el espacio a los procesos.
+    if (strcmp(ESQUEMA, "FIJAS") == 0)
+    {
+        int i = 0;
+        int acumulador = 0;
+        while (PARTICIONES[i])
+        {
+            int tamanio = atoi(PARTICIONES[i]);
+            t_particion *particion = malloc(sizeof(t_particion));
+            particion->base = memoria_usuario + acumulador;
+            particion->tamanio = tamanio;
+            particion->libre = true;
+            particion->orden = i;
+
+            log_info(logger, "PARTICION CREADA. BASE - %d / TAMANIO: %d\n / NUMERO: %d", acumulador, particion->tamanio, particion->orden);
+            list_add(lista_particiones, particion);
+
+            acumulador += tamanio;
+            i++;
+        }
+    }
 }
