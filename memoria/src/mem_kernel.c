@@ -1,12 +1,12 @@
 #include "../include/mem_kernel.h"
 
 // Por ahora, solamente esta contemplado el esquema de particiones fijas.
-void *asignar_memoria(int tamanio)
+int asignar_memoria(int tamanio, t_proceso *proceso)
 {
     if (tamanio <= 0)
     {
         log_error(logger, "INGRESE UN VALOR MAYOR A CERO PARA ASIGNAR MEMORIA.");
-        return;
+        return -1;
     }
 
     t_particion *particion_elegida = NULL;
@@ -24,19 +24,29 @@ void *asignar_memoria(int tamanio)
     if (particion_elegida)
     {
         particion_elegida->libre = false;
+        proceso->contexto->base = particion_elegida->base;
         log_info(logger, "PARTICION ASIGNADA, NUMERO: %d / TAMANIO PEDIDO: %d / TAMANIO DE LA PARTICION: %d", particion_elegida->orden, tamanio, particion_elegida->tamanio);
-        return particion_elegida->base;
+        return 0;
     }
     else
     {
         log_error(logger, "NO SE PUDO ASIGNAR LA MEMORIA.");
+        return -1;
     }
 }
 
-void crear_proceso(int pid, int tamanio)
+int crear_proceso(int pid, int tamanio)
 {
     t_proceso *proceso = malloc(sizeof(t_proceso));
     proceso->pid = pid;
+    proceso->contexto->limite = tamanio;
+    proceso->lista_hilos = list_create();
+    if (asignar_memoria(tamanio, proceso) == -1)
+    {
+        log_error(logger, "NO PUDO ASIGNARSE LA MEMORIA AL PROCESO");
+        EXIT_FAILURE;
+    }
+    return EXIT_SUCCESS;
 }
 
 void atender_kernel()
