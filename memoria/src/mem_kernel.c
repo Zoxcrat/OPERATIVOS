@@ -3,6 +3,12 @@
 // Por ahora, solamente esta contemplado el esquema de particiones fijas.
 void *asignar_memoria(int tamanio)
 {
+    if (tamanio <= 0)
+    {
+        log_error(logger, "INGRESE UN VALOR MAYOR A CERO PARA ASIGNAR MEMORIA.");
+        return;
+    }
+
     t_particion *particion_elegida = NULL;
     for (int i = 0; i < list_size(lista_particiones); i++)
     {

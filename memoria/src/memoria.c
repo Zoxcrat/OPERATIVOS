@@ -10,6 +10,7 @@ int main(int argc, char **argv)
     inicializar_memoria();
     asignar_memoria(13);
     asignar_memoria(13);
+    asignar_memoria(0);
 
     leer_archivo_pseudocodigo("prueba.txt");
 
