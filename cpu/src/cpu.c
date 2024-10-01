@@ -26,6 +26,8 @@ int main(int argc, char **argv) {
 		exit(1);
 	}
 
+    sleep(15);
+
 	terminar_programa();
 	return 0;
 }
@@ -42,9 +44,10 @@ void leer_config()
 }
 
 bool generar_conexiones(){
-	fd_memoria = crear_conexion2(IP_MEMORIA, PUERTO_MEMORIA);
-	pthread_create(&conexion_memoria, NULL, (void*) pedir_contexto_a_memoria, (void*) &fd_memoria);
-	pthread_detach(conexion_memoria);
+	//fd_memoria = crear_conexion2(IP_MEMORIA, PUERTO_MEMORIA);
+	//pthread_create(&conexion_memoria, NULL, (void*) pedir_contexto_a_memoria, (void*) &fd_memoria);
+	//pthread_detach(conexion_memoria);
+    fd_memoria=0;
 
     dispatch_socket = iniciar_servidor(logger, IP_ESCUCHA, PUERTO_ESCUCHA_DISPATCH);
     pthread_create(&hilo_dispatch, NULL, manejar_cliente_dispatch, &dispatch_socket);
@@ -60,13 +63,17 @@ bool generar_conexiones(){
 // Funciones para manejar conexiones
 void* manejar_cliente_dispatch() {
     int cliente_socket_dispatch = esperar_cliente(dispatch_socket, logger);
+    
+    char *respuesta = "Mensaje a enviar";
+    enviar_mensaje(respuesta, cliente_socket_dispatch);
+    
     if (cliente_socket_dispatch == -1) {
         log_error(logger, "Error al aceptar cliente de dispatch");
     }
     while (1){
         t_list* paquete = recibir_paquete(cliente_socket_dispatch);
 
-        op_code codigo_operacion = *(op_code*)list_get(paquete, 0);  // Primer elemento es el PID
+        op_code codigo_operacion = *(op_code*)list_get(paquete, 0);  // Primer elemento es el codigo_operacion
         pid_actual = *(int*)list_get(paquete, 1);
         tid_actual = *(int*)list_get(paquete, 2);
 
@@ -85,11 +92,10 @@ void* manejar_cliente_interrupt() {
     while (1) {
         sem_wait(&verificar_interrupcion);
         
-        int interrupt_signal;
-        recv(cliente_socket_interrupt, &interrupt_signal, sizeof(int), MSG_DONTWAIT); // Leer sin bloquear
+        int interrupcion = recibir_entero(fd_memoria);
 
-        if (interrupt_signal > 0) {
-            log_info(logger, "Interrupción recibida: %d", interrupt_signal);
+        if (interrupcion > 0) {
+            log_info(logger, "Interrupción recibida");
             interrupcion=1;
         }
     }
@@ -120,8 +126,9 @@ void pedir_contexto_a_memoria() {
 
 void cpu_cycle() {
     while (interrupcion == 0) {
-        fetch();        // Obtener la siguiente instrucción de la memoria
-        execute();      // Ejecutar la instrucción
+        char* instruccion = fetch();                            // Obtener la siguiente instrucción de la memoria
+        decode(instruccion);      // Decodificar la instrucción
+        execute();                         // Ejecutar la instrucción
         if (instruccion_actual->instruccion != SET && strcmp(instruccion_actual->parametro1, "PC") != 0){
             contexto->PC++;
         }
@@ -130,15 +137,52 @@ void cpu_cycle() {
     log_info(logger, "Ciclo de CPU interrumpido");
 }
 
-void fetch() {
+char* fetch() {
     log_info(logger, "FETCH - Solicitando instrucción PC=%d", contexto->PC);
-    send(fd_memoria, &contexto->PC, sizeof(uint32_t), 0);
-    recv(fd_memoria, &instruccion_actual, sizeof(t_instruccion_completa), 0);
+
+    enviar_entero(&contexto->PC, fd_memoria);
+
+    char* instruccion = recibir_mensaje2(dispatch_socket,logger);
+
     log_info(logger, "Instrucción recibida: %d", instruccion_actual->instruccion);
+    
+    return instruccion;
+}
+
+void decode(char* mensaje)
+{
+    // Tokenizamos el mensaje separando por espacios
+    char *token = strtok(mensaje, " ");
+
+    // La primera parte es la instrucción (convertimos la cadena al valor del enum)
+    instruccion_actual->instruccion = string_a_instruccion(token);
+
+    // Los siguientes tokens son los parámetros (si existen)
+    token = strtok(NULL, " ");
+    if (token != NULL) {
+        instruccion_actual->parametro1 = strdup(token);
+    } else {
+        instruccion_actual->parametro1 = NULL;
+    }
+
+    token = strtok(NULL, " ");
+    if (token != NULL) {
+        instruccion_actual->parametro2 = strdup(token);
+    } else {
+        instruccion_actual->parametro2 = NULL;
+    }
+
+    token = strtok(NULL, " ");
+    if (token != NULL) {
+        instruccion_actual->parametro3 = strdup(token);
+    } else {
+        instruccion_actual->parametro3 = NULL;
+    }
 }
 
 void execute() {
     switch (instruccion_actual->instruccion) {
+        t_paquete *paquete;
         case SET:
             uint32_t valor = (uint32_t) strtoul(instruccion_actual->parametro2, NULL, 5);
             set_valor_registro(instruccion_actual->parametro1, valor);
@@ -158,8 +202,11 @@ void execute() {
                 free(instruccion_actual->parametro1);
                 free(instruccion_actual->parametro2);
                 free(instruccion_actual->parametro3);
-                instruccion_actual->instruccion = SEGMENTATION_FAULT;
-                send(dispatch_socket, &instruccion_actual, sizeof(t_instruccion_completa), 0);
+                // Crear un paquete
+                t_paquete *paquete = crear_paquete();
+                enviar_peticion(paquete,dispatch_socket,SEGMENTATION_FAULT);
+                eliminar_paquete(paquete);
+
                 free(instruccion_actual);
                 log_error(logger, "READ MEM: Segmentation Fault al intentar acceder a la dirección lógica %d", direccion_fis);
             }
@@ -175,8 +222,10 @@ void execute() {
                 free(instruccion_actual->parametro1);
                 free(instruccion_actual->parametro2);
                 free(instruccion_actual->parametro3);
-                instruccion_actual->instruccion = SEGMENTATION_FAULT;
-                send(dispatch_socket, &instruccion_actual, sizeof(t_instruccion_completa), 0);
+                // Crear un paquete
+                t_paquete *paquete = crear_paquete();
+                enviar_peticion(paquete,dispatch_socket,SEGMENTATION_FAULT);
+                eliminar_paquete(paquete);
                 free(instruccion_actual);
                 log_error(logger, "READ MEM: Segmentation Fault al intentar acceder a la dirección lógica %d", direccion_fis);
             }
@@ -195,52 +244,130 @@ void execute() {
             break;
         case PROCESS_CREATE:
             log_info(logger, "operacion PROCESS_CREATE - Notificando al Kernel");
-            send(dispatch_socket, &instruccion_actual, sizeof(t_instruccion_completa), 0);
+                // Crear un paquete
+            paquete= crear_paquete();
+            agregar_a_paquete(paquete, instruccion_actual->parametro1, strlen(instruccion_actual->parametro1) + 1); // +1 for null terminator
+            agregar_a_paquete(paquete, instruccion_actual->parametro2, strlen(instruccion_actual->parametro2) + 1);
+            agregar_a_paquete(paquete, instruccion_actual->parametro3, strlen(instruccion_actual->parametro3) + 1);
+            enviar_peticion(paquete,dispatch_socket,PROCESS_CREATE);
+            eliminar_paquete(paquete);
             break;
         case PROCESS_EXIT:
             log_info(logger, "operacion PROCESS_EXIT - Notificando al Kernel");
-            send(dispatch_socket, &instruccion_actual, sizeof(t_instruccion_completa), 0);
+            paquete= crear_paquete();
+            agregar_a_paquete(paquete, instruccion_actual->parametro1, strlen(instruccion_actual->parametro1) + 1); // +1 for null terminator
+            agregar_a_paquete(paquete, instruccion_actual->parametro2, strlen(instruccion_actual->parametro2) + 1);
+            agregar_a_paquete(paquete, instruccion_actual->parametro3, strlen(instruccion_actual->parametro3) + 1);
+            enviar_peticion(paquete,dispatch_socket,PROCESS_EXIT);
+            eliminar_paquete(paquete);
             break;
         case THREAD_CREATE:
             log_info(logger, "operacion THREAD_CREATE - Notificando al Kernel");
-            send(dispatch_socket, &instruccion_actual, sizeof(t_instruccion_completa), 0);
+            paquete= crear_paquete();
+            agregar_a_paquete(paquete, instruccion_actual->parametro1, strlen(instruccion_actual->parametro1) + 1); // +1 for null terminator
+            agregar_a_paquete(paquete, instruccion_actual->parametro2, strlen(instruccion_actual->parametro2) + 1);
+            agregar_a_paquete(paquete, instruccion_actual->parametro3, strlen(instruccion_actual->parametro3) + 1);
+            enviar_peticion(paquete,dispatch_socket,THREAD_CREATE);
+            eliminar_paquete(paquete);
             break;
         case THREAD_JOIN:
             log_info(logger, "operacion THREAD_JOIN - Notificando al Kernel");
-            send(dispatch_socket, &instruccion_actual, sizeof(t_instruccion_completa), 0);
+            paquete= crear_paquete();
+            agregar_a_paquete(paquete, instruccion_actual->parametro1, strlen(instruccion_actual->parametro1) + 1); // +1 for null terminator
+            agregar_a_paquete(paquete, instruccion_actual->parametro2, strlen(instruccion_actual->parametro2) + 1);
+            agregar_a_paquete(paquete, instruccion_actual->parametro3, strlen(instruccion_actual->parametro3) + 1);
+            enviar_peticion(paquete,dispatch_socket,THREAD_JOIN);
+            eliminar_paquete(paquete);
             break;
         case THREAD_CANCEL:
             log_info(logger, "operacion THREAD_CANCEL - Notificando al Kernel");
-            send(dispatch_socket, &instruccion_actual, sizeof(t_instruccion_completa), 0);
+            paquete= crear_paquete();
+            agregar_a_paquete(paquete, instruccion_actual->parametro1, strlen(instruccion_actual->parametro1) + 1); // +1 for null terminator
+            agregar_a_paquete(paquete, instruccion_actual->parametro2, strlen(instruccion_actual->parametro2) + 1);
+            agregar_a_paquete(paquete, instruccion_actual->parametro3, strlen(instruccion_actual->parametro3) + 1);
+            enviar_peticion(paquete,dispatch_socket,THREAD_CANCEL);
+            eliminar_paquete(paquete);
             break;
         case THREAD_EXIT:
             log_info(logger, "operacion THREAD_EXIT - Notificando al Kernel");
-            send(dispatch_socket, &instruccion_actual, sizeof(t_instruccion_completa), 0);
+            paquete= crear_paquete();
+            agregar_a_paquete(paquete, instruccion_actual->parametro1, strlen(instruccion_actual->parametro1) + 1); // +1 for null terminator
+            agregar_a_paquete(paquete, instruccion_actual->parametro2, strlen(instruccion_actual->parametro2) + 1);
+            agregar_a_paquete(paquete, instruccion_actual->parametro3, strlen(instruccion_actual->parametro3) + 1);
+            enviar_peticion(paquete,dispatch_socket,THREAD_EXIT);
+            eliminar_paquete(paquete);
             break;
         case MUTEX_CREATE:
             log_info(logger, "operacion MUTEX_CREATE - Notificando al Kernel");
-            send(dispatch_socket, &instruccion_actual, sizeof(t_instruccion_completa), 0);
+            paquete= crear_paquete();
+            agregar_a_paquete(paquete, instruccion_actual->parametro1, strlen(instruccion_actual->parametro1) + 1); // +1 for null terminator
+            agregar_a_paquete(paquete, instruccion_actual->parametro2, strlen(instruccion_actual->parametro2) + 1);
+            agregar_a_paquete(paquete, instruccion_actual->parametro3, strlen(instruccion_actual->parametro3) + 1);
+            enviar_peticion(paquete,dispatch_socket,MUTEX_CREATE);
+            eliminar_paquete(paquete);
             break;
         case MUTEX_LOCK:
             log_info(logger, "operacion MUTEX_LOCK - Notificando al Kernel");
-            send(dispatch_socket, &instruccion_actual, sizeof(t_instruccion_completa), 0);
+            paquete= crear_paquete();
+            agregar_a_paquete(paquete, instruccion_actual->parametro1, strlen(instruccion_actual->parametro1) + 1); // +1 for null terminator
+            agregar_a_paquete(paquete, instruccion_actual->parametro2, strlen(instruccion_actual->parametro2) + 1);
+            agregar_a_paquete(paquete, instruccion_actual->parametro3, strlen(instruccion_actual->parametro3) + 1);
+            enviar_peticion(paquete,dispatch_socket,MUTEX_LOCK);
+            eliminar_paquete(paquete);
             break;
         case MUTEX_UNLOCK:
             log_info(logger, "operacion MUTEX_UNLOCK - Notificando al Kernel");
-            send(dispatch_socket, &instruccion_actual, sizeof(t_instruccion_completa), 0);
+            paquete= crear_paquete();
+            agregar_a_paquete(paquete, instruccion_actual->parametro1, strlen(instruccion_actual->parametro1) + 1); // +1 for null terminator
+            agregar_a_paquete(paquete, instruccion_actual->parametro2, strlen(instruccion_actual->parametro2) + 1);
+            agregar_a_paquete(paquete, instruccion_actual->parametro3, strlen(instruccion_actual->parametro3) + 1);
+            enviar_peticion(paquete,dispatch_socket,MUTEX_UNLOCK);
+            eliminar_paquete(paquete);
             break;
         case DUMP_MEMORY:
             log_info(logger, "operacion DUMP_MEMORY - Notificando al Kernel");
-            send(dispatch_socket, &instruccion_actual, sizeof(t_instruccion_completa), 0);
+            paquete= crear_paquete();
+            agregar_a_paquete(paquete, instruccion_actual->parametro1, strlen(instruccion_actual->parametro1) + 1); // +1 for null terminator
+            agregar_a_paquete(paquete, instruccion_actual->parametro2, strlen(instruccion_actual->parametro2) + 1);
+            agregar_a_paquete(paquete, instruccion_actual->parametro3, strlen(instruccion_actual->parametro3) + 1);
+            enviar_peticion(paquete,dispatch_socket,DUMP_MEMORY);
+            eliminar_paquete(paquete);
             break;
         case IO:
             log_info(logger, "operacion IO - Notificando al Kernel");
-            send(dispatch_socket, &instruccion_actual, sizeof(t_instruccion_completa), 0);
+            paquete= crear_paquete();
+            agregar_a_paquete(paquete, instruccion_actual->parametro1, strlen(instruccion_actual->parametro1) + 1); // +1 for null terminator
+            agregar_a_paquete(paquete, instruccion_actual->parametro2, strlen(instruccion_actual->parametro2) + 1);
+            agregar_a_paquete(paquete, instruccion_actual->parametro3, strlen(instruccion_actual->parametro3) + 1);
+            enviar_peticion(paquete,dispatch_socket,IO);
+            eliminar_paquete(paquete);
             break;
         default:
             log_warning(logger, "Instrucción no reconocida");
             break;
     }
+}
+
+t_instruccion string_a_instruccion(char *str) {
+    if (strcmp(str, "SET") == 0) return SET;
+    if (strcmp(str, "READ_MEM") == 0) return READ_MEM;
+    if (strcmp(str, "WRITE_MEM") == 0) return WRITE_MEM;
+    if (strcmp(str, "SUM") == 0) return SUM;
+    if (strcmp(str, "SUB") == 0) return SUB;
+    if (strcmp(str, "JNZ") == 0) return JNZ;
+    if (strcmp(str, "LOG") == 0) return LOG;
+    if (strcmp(str, "PROCESS_CREATE") == 0) return PROCESS_CREATE;
+    if (strcmp(str, "PROCESS_EXIT") == 0) return PROCESS_EXIT;
+    if (strcmp(str, "THREAD_CREATE") == 0) return THREAD_CREATE;
+    if (strcmp(str, "THREAD_JOIN") == 0) return THREAD_JOIN;
+    if (strcmp(str, "THREAD_CANCEL") == 0) return THREAD_CANCEL;
+    if (strcmp(str, "THREAD_EXIT") == 0) return THREAD_EXIT;
+    if (strcmp(str, "MUTEX_CREATE") == 0) return MUTEX_CREATE;
+    if (strcmp(str, "MUTEX_LOCK") == 0) return MUTEX_LOCK;
+    if (strcmp(str, "MUTEX_UNLOCK") == 0) return MUTEX_UNLOCK;
+    if (strcmp(str, "DUMP_MEMORY") == 0) return DUMP_MEMORY;
+    if (strcmp(str, "IO") == 0) return IO;
+    return SEGMENTATION_FAULT;  // Valor por defecto en caso de error
 }
 
 int traducir_direccion_logica_a_fisica(int direccion_logica){
@@ -513,8 +640,7 @@ uint32_t leer_memoria(int direccion_fisica){
     enviar_peticion(paquete, fd_memoria, LEER_MEMORIA);
     eliminar_paquete(paquete);
 
-    uint32_t valor_leido;
-    recv(fd_memoria, &valor_leido, sizeof(uint32_t), MSG_WAITALL);
+    uint32_t valor_leido = recibir_entero(fd_memoria);
     return valor_leido;
 }
 
@@ -525,8 +651,7 @@ void escribir_memoria(char* registro_datos,int direccion_fisica){
     enviar_peticion(paquete, fd_memoria, ESCRIBIR_MEMORIA);
     eliminar_paquete(paquete);
 
-    int respuesta;
-    recv(fd_memoria, &respuesta, sizeof(int), MSG_WAITALL);
+    int respuesta = recibir_entero(fd_memoria);
 }
 
 // variables del programa
@@ -551,6 +676,4 @@ void terminar_programa(){
     sem_destroy(&pedir_contexto);
     sem_destroy(&verificar_interrupcion);
     free(conexion_memoria);
-    free(hilo_dispatch);
-    free(hilo_interrupt);
 }

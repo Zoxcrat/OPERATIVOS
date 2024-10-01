@@ -29,8 +29,8 @@ void *gestor_dump_memory(void)
             agregar_a_paquete(paquete, &hilo->TID, sizeof(int));
             enviar_peticion(paquete,fd_memoria,DUMP_MEMORY);
             eliminar_paquete(paquete);
-            int respuesta;
-            recv(fd_cpu_dispatch, &respuesta, sizeof(int), 0);
+            
+            int respuesta = recibir_entero(fd_memoria);
 
             if (respuesta == 1){
                 pthread_mutex_lock(&mutex_log);
@@ -40,15 +40,13 @@ void *gestor_dump_memory(void)
                 // Pasar el proceso a READY
                 hilo->estado = READY;
                 agregar_a_ready(hilo);
-                
-                close(fd_memoria);
 
                 sem_post(&hay_hilos_en_ready);
             }else{
                 finalizar_hilo(hilo->PID,hilo->TID);
             }
 
-            
+            close(fd_memoria);
         }
     }
 }

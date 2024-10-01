@@ -102,14 +102,17 @@ int main(int argc, char **argv)
     enviar_mensaje("Hola CPU interrupt, Soy Kernel!", fd_cpu_interrupt);
     enviar_mensaje("Hola CPU dispatcher, Soy Kernel!", fd_cpu_dispatch);
 
-    inicializar_plani_largo_plazo();
-    inicializar_plani_corto_plazo();
-    inicializar_gestor_io();
+    //inicializar_plani_largo_plazo();
+    //inicializar_plani_corto_plazo();
+    //inicializar_gestor_io();
+    //inicializar_gestor_dump_memory();
     if (ALGORITMO_PLANIFICACION == COLAS_MULTINIVEL){
         inicializar_gestor_quantum();
     }
 
     crear_proceso(archivo_pseudocodigo, tamanio_proceso, 0);
+
+    sleep(15);
 
     terminar_programa();
     return 0;
@@ -168,15 +171,8 @@ bool generar_conexiones(){
 void procesar_conexion_cpu_dispatch() {
     while (1) {
         t_instruccion_completa* syscall;
-        
-        // Recibir el código de la syscall
-        if (recv(fd_cpu_dispatch, &syscall, sizeof(t_instruccion_completa), MSG_WAITALL) <= 0) {
-            pthread_mutex_lock(&mutex_log);
-            log_error(logger, "No se pudo recibir la syscall de la CPU");
-            pthread_mutex_unlock(&mutex_log);
-            close(fd_cpu_dispatch);
-            break;
-        }
+
+        recibir_mensaje(fd_cpu_dispatch, logger);
 
         // Procesar la syscall según el código recibido
         switch (syscall->instruccion) {
@@ -334,6 +330,21 @@ void procesar_conexion_cpu_dispatch() {
                 sem_post(&hay_hilos_en_io);
                 sem_post(&mandar_interrupcion);
             }
+            case SEGMENTATION_FAULT: {
+                pthread_mutex_lock(&mutex_log);
+                log_info(logger_obligatorio, "## (%d:%d) - Hubo un: SEGMENTATION FAULT", hilo_en_exec->PID,hilo_en_exec->TID);
+                pthread_mutex_unlock(&mutex_log);
+
+                hilo_desalojado = true;
+                finalizar_proceso(hilo_en_exec->PID);
+
+                pthread_mutex_lock(&mutex_hilo_exec);
+                hilo_en_exec = NULL;
+                pthread_mutex_unlock(&mutex_hilo_exec);
+
+                sem_post(&hay_hilos_en_ready);
+                break;
+            }
             default: {
                 log_error(logger, "Código de syscall no reconocido");
                 break;
@@ -347,7 +358,7 @@ void procesar_conexion_cpu_interrupt(){
         sem_wait(&mandar_interrupcion);
 
         int interrupcion = 1;
-        send(fd_cpu_interrupt, &interrupcion, sizeof(int), 0);  // Enviar la interrupción
+        enviar_entero(interrupcion, fd_cpu_interrupt);// Enviar la interrupción
     }
 }
 

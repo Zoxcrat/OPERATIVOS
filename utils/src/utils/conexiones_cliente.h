@@ -147,5 +147,5 @@ void enviar_entero(int valor, int socket_cliente);
  * Similar a crear_conexion, pero no envía un mensaje (para tener control sobre el handshake).
  */
 int crear_conexion2(char *ip, char *puerto);
-
+void agregar_instruccion_a_paquete(t_paquete *paquete, t_instruccion_completa *instruccion);
 #endif // !CONEXIONES_CLIENTE

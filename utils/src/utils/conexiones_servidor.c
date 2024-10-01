@@ -69,6 +69,13 @@ void recibir_mensaje(int socket_cliente, t_log *logger)
     log_info(logger, "Me llego el mensaje %s", buffer);
     free(buffer);
 }
+char* recibir_mensaje2(int socket_cliente, t_log *logger)
+{
+    int size;
+    char *buffer = recibir_buffer(&size, socket_cliente);
+    log_info(logger, "Me llego el mensaje %s", buffer);
+    return buffer;  // Retorna el buffer en lugar de liberarlo
+}
 t_list *recibir_paquete(int socket_cliente)
 {
     int size, desplazamiento = 0, tamanho;

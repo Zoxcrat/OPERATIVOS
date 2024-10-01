@@ -20,7 +20,6 @@ void crear_proceso(char *archivo_pseudocodigo, int tamanio_proceso, int priorida
     pthread_mutex_unlock(&mutex_procesos_en_new);
     
     sem_post(&verificar_cola_new);
-    printf(sem_getvalue(&verificar_cola_new,NULL)); // no se por que ayuda poner esto
 }
 
 void inicializar_proceso(PCB* proceso){
@@ -347,8 +346,7 @@ int informar_inicializacion_proceso_a_memoria(int pid, int tamanio){
 	agregar_a_paquete(paquete, &tamanio, sizeof(int));
     enviar_peticion(paquete,fd_memoria,INICIALIZAR_PROCESO);
 	eliminar_paquete(paquete);
-    int respuesta; 
-    recv(fd_memoria, &respuesta, sizeof(int), 0);
+    int respuesta = recibir_entero(fd_memoria);
     close(fd_memoria);  // Cerrar la conexión con memoria
     return respuesta;
 }
@@ -360,8 +358,7 @@ int informar_finalizacion_proceso_a_memoria(int pid){
 	agregar_a_paquete(paquete, &pid, sizeof(int));
     enviar_peticion(paquete,fd_memoria,FINALIZACION_PROCESO);
 	eliminar_paquete(paquete);
-    int respuesta; 
-    recv(fd_memoria, &respuesta, sizeof(int), 0);
+    int respuesta = recibir_entero(fd_memoria);
     close(fd_memoria);  // Cerrar la conexión con memoria
     return respuesta;
 }
@@ -375,8 +372,7 @@ int informar_creacion_hilo_a_memoria(int pid, int tid, char* archivo_pseudocodig
 	agregar_a_paquete(paquete, archivo_pseudocodigo, strlen(archivo_pseudocodigo) + 1);
     enviar_peticion(paquete,fd_memoria,CREACION_HILO);
 	eliminar_paquete(paquete);
-    int respuesta;
-    recv(fd_memoria, &respuesta, sizeof(int), 0);
+    int respuesta = recibir_entero(fd_memoria);
     close(fd_memoria);  // Cerrar la conexión con memoria
     return respuesta;
 }
@@ -389,8 +385,7 @@ int informar_finalizacion_hilo_a_memoria(int pid, int tid){
 	agregar_a_paquete(paquete, &tid, sizeof(int));
     enviar_peticion(paquete,fd_memoria,FINALIZACION_HILO);
 	eliminar_paquete(paquete);
-    int respuesta; 
-    recv(fd_memoria, &respuesta, sizeof(int), 0);
+    int respuesta = recibir_entero(fd_memoria);
     close(fd_memoria);  // Cerrar la conexión con memoria
     return respuesta;
 }

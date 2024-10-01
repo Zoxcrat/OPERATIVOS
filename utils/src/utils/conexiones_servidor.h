@@ -41,6 +41,7 @@ void* recibir_buffer(int*, int );
  * @param logger puntero del archivo log al cual se enviara el estado.
 */
 void recibir_mensaje(int, t_log*);
+char* recibir_mensaje2(int, t_log*);
 /**
  * @fn recibir_paquete
  * @brief recibe un paquete de datos del cliente indicado
