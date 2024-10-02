@@ -10,6 +10,9 @@
 #include <commons/log.h>
 #include <commons/collections/list.h>
 #include <commons/string.h>
+#include "protocolo.h"
+
+t_contexto_ejecucion* recibir_contexto(int socket_cliente);
 /**
  * @fn iniciar_servidor
  * @brief Inicia el servidor con un puerto determinado

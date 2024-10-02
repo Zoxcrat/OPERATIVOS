@@ -114,9 +114,7 @@ void pedir_contexto_a_memoria() {
         eliminar_paquete(paquete);
 
         // Recibir el contexto de memoria
-        if (recv(fd_memoria, contexto, sizeof(t_contexto_ejecucion), 0) <= 0) {
-            log_error(logger, "Error al recibir el contexto de memoria");
-        }
+        contexto = recibir_contexto(fd_memoria);
         
         interrupcion = 0;
         cpu_cycle();

@@ -93,3 +93,14 @@ t_list *recibir_paquete(int socket_cliente)
     free(buffer);
     return valores;
 }
+
+t_contexto_ejecucion* recibir_contexto(int socket_cliente) {
+    // Reservamos memoria para recibir la estructura
+    t_contexto_ejecucion *contexto = malloc(sizeof(t_contexto_ejecucion));
+    
+    // Recibimos el contexto desde el socket
+    recv(socket_cliente, contexto, sizeof(t_contexto_ejecucion), MSG_WAITALL);
+    
+    return contexto;
+}
+

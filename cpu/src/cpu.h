@@ -22,11 +22,6 @@ char* IP_MEMORIA;
 char* PUERTO_MEMORIA;
 t_log_level LOG_LEVEL;
 
-//definir registros de la CPU
-typedef struct {
-    uint32_t PC,AX,BX,CX,DX,EX, FX, GX, HX, base, limite;
-} t_contexto_ejecucion;
-
 t_log* logger;
 t_log* logger_obligatorio;
 t_config* config;

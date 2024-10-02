@@ -9,6 +9,7 @@
 #include <string.h>
 #include <commons/log.h>
 #include <commons/string.h>
+#include "protocolo.h"
 
 typedef enum
 {
@@ -84,6 +85,7 @@ typedef struct
 	t_buffer *buffer;
 } t_paquete;
 
+void enviar_contexto(t_contexto_ejecucion* contexto, int socket_cliente);
 /**
  * @fn crear_conexion
  * @brief
