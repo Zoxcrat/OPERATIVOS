@@ -47,9 +47,10 @@ extern t_log_level LOG_LEVEL;
 // Variables de memoria
 extern void *memoria_usuario;
 extern t_list *lista_particiones;
+extern t_list *lista_procesos_en_memoria;
 typedef struct t_contexto_proceso
 {
-    int base;
+    void *base;
     int limite;
 } t_contexto_proceso;
 
@@ -61,7 +62,6 @@ typedef struct t_registros_cpu
 typedef struct t_hilo
 {
     int tid;
-    int pid;
     t_registros_cpu *registros;
 } t_hilo;
 

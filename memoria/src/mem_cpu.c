@@ -1,18 +1,5 @@
 #include "../include/mem_cpu.h"
 
-void inicializar_registros(t_registros_cpu *registros)
-{
-    registros->AX = 0;
-    registros->BX = 0;
-    registros->CX = 0;
-    registros->DX = 0;
-    registros->EX = 0;
-    registros->FX = 0;
-    registros->GX = 0;
-    registros->HX = 0;
-    registros->PC = 0;
-}
-
 void atender_cpu()
 {
 

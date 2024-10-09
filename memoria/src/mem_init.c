@@ -21,6 +21,8 @@ int inicializar_memoria()
     lista_particiones = list_create();
     particionar_memoria();
 
+    lista_procesos_en_memoria = list_create();
+
     // Inicializar servidor de Memoria
     memoria_socket = iniciar_servidor(logger, IP_ESCUCHA, PUERTO_ESCUCHA);
     if (memoria_socket == -1)

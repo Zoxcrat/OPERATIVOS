@@ -8,9 +8,11 @@ int main(int argc, char **argv)
     }
 
     inicializar_memoria();
-    asignar_memoria(13);
-    asignar_memoria(13);
-    asignar_memoria(0);
+
+    crear_proceso(0, 120);
+    crear_hilo(0, NULL);
+    crear_hilo(0, NULL);
+    crear_hilo(0, NULL);
 
     leer_archivo_pseudocodigo("prueba.txt");
 

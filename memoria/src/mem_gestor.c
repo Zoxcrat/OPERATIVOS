@@ -28,3 +28,4 @@ t_log_level LOG_LEVEL;
 // Variables de memoria
 void *memoria_usuario;
 t_list *lista_particiones;
+t_list *lista_procesos_en_memoria;
