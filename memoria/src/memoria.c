@@ -10,11 +10,7 @@ int main(int argc, char **argv)
     inicializar_memoria();
 
     crear_proceso(0, 120);
-    crear_hilo(0, NULL);
-    crear_hilo(0, NULL);
-    crear_hilo(0, NULL);
-
-    leer_archivo_pseudocodigo("prueba.txt");
+    crear_hilo(0, "prueba.txt");
 
     // Conexion con FS
     fd_filesystem = crear_conexion2(IP_FILESYSTEM, PUERTO_FILESYSTEM);

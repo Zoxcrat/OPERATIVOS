@@ -63,6 +63,7 @@ typedef struct t_hilo
 {
     int tid;
     t_registros_cpu *registros;
+    t_list *lista_instrucciones;
 } t_hilo;
 
 typedef struct t_proceso

@@ -1,7 +1,7 @@
 #include <../include/mem_instrucciones.h>
 #include <stdio.h>
 
-t_list *leer_archivo_pseudocodigo(char *archivo_a_leer)
+void leer_archivo_pseudocodigo(char *archivo_a_leer, t_list *lista_instrucciones)
 {
     char *ruta_completa = malloc(sizeof(char) * 50);
     sprintf(ruta_completa, "%s/%s", PATH_INSTRUCCIONES, archivo_a_leer);
@@ -13,14 +13,15 @@ t_list *leer_archivo_pseudocodigo(char *archivo_a_leer)
         log_error(logger, "No se pudo abrir el archivo \n");
         exit(0);
     }
-    t_list *lista_instrucciones = list_create();
     char lineaActual[100];
     while (fgets(lineaActual, sizeof(lineaActual), archivo) != NULL)
     {
-        // printf("Instruccion: %s", lineaActual);
-        list_add(lista_instrucciones, lineaActual);
+        char *nuevaInst = strdup(lineaActual);
+        nuevaInst = strtok(nuevaInst, "\n");
+        printf("Instruccion: %s\n", nuevaInst);
+        list_add(lista_instrucciones, nuevaInst);
     }
 
     fclose(archivo);
-    return lista_instrucciones;
+    return;
 }

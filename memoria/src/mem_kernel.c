@@ -82,7 +82,11 @@ int crear_hilo(int pid, char *archivo_de_pseudocodigo)
         nuevo_hilo->tid = proceso->lista_hilos->elements_count;
         nuevo_hilo->registros = malloc(sizeof(t_registros_cpu));
         inicializar_registros(nuevo_hilo->registros);
+        nuevo_hilo->lista_instrucciones = list_create();
+
         list_add(proceso->lista_hilos, nuevo_hilo);
+        leer_archivo_pseudocodigo(archivo_de_pseudocodigo, nuevo_hilo->lista_instrucciones);
+
         log_info(logger, "HILO CREADO EXITOSAMENTE PARA PID: %d CON TID: %d", proceso->pid, nuevo_hilo->tid);
         return EXIT_SUCCESS;
     }
