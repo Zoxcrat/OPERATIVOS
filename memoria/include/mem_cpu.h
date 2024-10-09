@@ -3,7 +3,7 @@
 
 #include "mem_gestor.h"
 
-t_registros_cpu *obtener_contexto(int pid, int tid);
+t_contexto_ejecucion *obtener_contexto(int pid, int tid);
 int actualizar_contexto(int pid, int tid);
 
 #endif
