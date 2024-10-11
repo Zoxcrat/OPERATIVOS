@@ -94,7 +94,7 @@ void* manejar_cliente_interrupt() {
         
         int interrupcion = recibir_entero(fd_memoria);
 
-        if (interrupcion > 0) {
+        if (interrupcion == 1) {
             log_info(logger, "Interrupción recibida");
             interrupcion=1;
         }
@@ -124,9 +124,9 @@ void pedir_contexto_a_memoria() {
 
 void cpu_cycle() {
     while (interrupcion == 0) {
-        char* instruccion = fetch();                            // Obtener la siguiente instrucción de la memoria
-        decode(instruccion);      // Decodificar la instrucción
-        execute();                         // Ejecutar la instrucción
+        char* instruccion = fetch();     // Obtener la siguiente instrucción de la memoria
+        decode(instruccion);             // Decodificar la instrucción
+        execute();                       // Ejecutar la instrucción
         if (instruccion_actual->instruccion != SET && strcmp(instruccion_actual->parametro1, "PC") != 0){
             contexto->PC++;
         }

@@ -10,11 +10,10 @@ void *gestor_dump_memory(void)
 {
     while (true)
     {
-        // Espera a que haya procesos en estado BLOCKED
+        // Espera a que haya hilos para hacerle un dump_memory
         sem_wait(&hay_hilos_en_dump_memory);
 
         if (!list_is_empty(cola_dump_memory)){
-            // Tomar el primer proceso de la lista de procesos en cola IO
             pthread_mutex_lock(&mutex_cola_dump_memory);
             TCB* hilo = list_remove(cola_dump_memory, 0);
             pthread_mutex_unlock(&mutex_cola_dump_memory);
@@ -43,7 +42,7 @@ void *gestor_dump_memory(void)
 
                 sem_post(&hay_hilos_en_ready);
             }else{
-                finalizar_hilo(hilo->PID,hilo->TID);
+                finalizar_proceso(hilo->PID);
             }
 
             close(fd_memoria);

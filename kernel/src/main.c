@@ -21,6 +21,7 @@ t_log_level LOG_LEVEL;
 // Variables PCBs
 int pid_global;
 t_list* procesos_sistema;
+t_list* hilos_sistema;
 t_list* cola_new;
 t_list* cola_ready;
 t_list* cola_ready_multinivel;
@@ -31,7 +32,9 @@ t_list* cola_dump_memory;
 TCB* hilo_en_exec;
 TCB* hilo_inicial;
 int pid_a_buscar;
-bool hilo_desalojado; 
+int tid_a_buscar;
+bool hilo_desalojado;
+int interrupcion;  
 
 // Semaforos
 sem_t verificar_cola_new;
@@ -54,6 +57,7 @@ pthread_t* conexion_cpu_interrupt;
 // Mutexs
 pthread_mutex_t mutex_procesos_en_new;
 pthread_mutex_t mutex_procesos_sistema;
+pthread_mutex_t mutex_hilos_sistema;
 pthread_mutex_t mutex_cola_ready;
 pthread_mutex_t mutex_colas_multinivel;
 pthread_mutex_t mutex_cola_io;
@@ -184,6 +188,9 @@ void procesar_conexion_cpu_dispatch() {
                 crear_proceso(syscall->parametro1, atoi(syscall->parametro2), atoi(syscall->parametro3));
                 free(syscall->parametro1);
                 free(syscall);
+
+                interrupcion = 0;
+                sem_post(&mandar_interrupcion);
             }
             case PROCESS_EXIT: {
                 pthread_mutex_lock(&mutex_log);
@@ -191,6 +198,11 @@ void procesar_conexion_cpu_dispatch() {
                 pthread_mutex_unlock(&mutex_log);
                 
                 finalizar_proceso(hilo_en_exec->PID);
+                
+                hilo_en_exec = NULL;
+                interrupcion = 1;
+                sem_post(&mandar_interrupcion);
+                sem_post(&hay_hilos_en_ready);
                 break;
             }
             case THREAD_CREATE: {
@@ -207,6 +219,9 @@ void procesar_conexion_cpu_dispatch() {
 
                 free(syscall->parametro1);
                 free(syscall);
+
+                interrupcion = 0;
+                sem_post(&mandar_interrupcion);
                 break;
             }
             case THREAD_JOIN: {
@@ -222,9 +237,14 @@ void procesar_conexion_cpu_dispatch() {
 
                 if (hilo_asociado != NULL) {
                     manejar_thread_join(atoi(syscall->parametro1));
+                    interrupcion = 1;
+                    sem_post(&mandar_interrupcion);
                     sem_post(&hay_hilos_en_ready);
                 } else {
                     // Si el hilo con el TID no existe o ya ha terminado, no hacer nada
+                    interrupcion = 0;
+                    sem_post(&mandar_interrupcion);
+
                     pthread_mutex_lock(&mutex_log);
                     log_info(logger, "Hilo %d del proceso %d no existe o ya ha terminado, el hilo que invoca THREAD_JOIN continuará su ejecución",atoi(syscall->parametro1),proceso_asociado->PID);
                     pthread_mutex_unlock(&mutex_log);
@@ -236,12 +256,11 @@ void procesar_conexion_cpu_dispatch() {
                 pthread_mutex_lock(&mutex_log);
                 log_info(logger_obligatorio, "## (%d:%d) - Solicitó syscall: THREAD_CANCEL", hilo_en_exec->PID,hilo_en_exec->TID);
                 pthread_mutex_unlock(&mutex_log);
-                
-                TCB* hilo_requerido = buscar_hilo_por_pid_tid(hilo_en_exec->PID, atoi(syscall->parametro1));
 
-                if(hilo_requerido != NULL){
-                    finalizar_hilo(hilo_en_exec->PID, atoi(syscall->parametro1));
-                }
+                finalizar_hilo(hilo_en_exec->PID, atoi(syscall->parametro1));
+
+                interrupcion = 0;
+                sem_post(&mandar_interrupcion);
                 break;
             }
             case THREAD_EXIT: {
@@ -250,6 +269,12 @@ void procesar_conexion_cpu_dispatch() {
                 pthread_mutex_unlock(&mutex_log);
 
                 finalizar_hilo(hilo_en_exec->PID, hilo_en_exec->TID);
+
+                hilo_en_exec = NULL;
+
+                interrupcion = 1;
+                sem_post(&mandar_interrupcion);
+                sem_post(&hay_hilos_en_ready);
                 break;
             }
             case MUTEX_CREATE: {
@@ -259,6 +284,9 @@ void procesar_conexion_cpu_dispatch() {
 
                 crear_mutex(syscall->parametro1);
                 free(syscall->parametro1);
+
+                interrupcion = 0;
+                sem_post(&mandar_interrupcion);
                 break;
             }
             case MUTEX_LOCK: {
@@ -277,6 +305,9 @@ void procesar_conexion_cpu_dispatch() {
 
                 unlockear_mutex(syscall->parametro1);
                 free(syscall->parametro1);
+
+                interrupcion = 0;
+                sem_post(&mandar_interrupcion);
                 break;
             }
             case DUMP_MEMORY: {
@@ -301,7 +332,10 @@ void procesar_conexion_cpu_dispatch() {
                 list_add(cola_dump_memory, hilo);
                 pthread_mutex_unlock(&mutex_cola_dump_memory);
                 
+                interrupcion = 1;
+                sem_post(&mandar_interrupcion);
                 sem_post(&hay_hilos_en_dump_memory);
+                sem_post(&hay_hilos_en_ready);
             }
             case IO: {
                 pthread_mutex_lock(&mutex_log);
@@ -327,8 +361,9 @@ void procesar_conexion_cpu_dispatch() {
                 hilo_en_exec = NULL;
                 pthread_mutex_unlock(&mutex_hilo_exec);
 
-                sem_post(&hay_hilos_en_io);
+                interrupcion = 1;
                 sem_post(&mandar_interrupcion);
+                sem_post(&hay_hilos_en_io);
             }
             case SEGMENTATION_FAULT: {
                 pthread_mutex_lock(&mutex_log);
@@ -342,6 +377,8 @@ void procesar_conexion_cpu_dispatch() {
                 hilo_en_exec = NULL;
                 pthread_mutex_unlock(&mutex_hilo_exec);
 
+                interrupcion =1 ;
+                sem_post(&mandar_interrupcion);
                 sem_post(&hay_hilos_en_ready);
                 break;
             }
@@ -357,7 +394,6 @@ void procesar_conexion_cpu_interrupt(){
     while (1){
         sem_wait(&mandar_interrupcion);
 
-        int interrupcion = 1;
         enviar_entero(interrupcion, fd_cpu_interrupt);// Enviar la interrupción
     }
 }
@@ -374,6 +410,7 @@ void conectar_memoria(){
 void inicializar_estructuras()
 {
     procesos_sistema = list_create();
+    hilos_sistema = list_create();
     cola_new = list_create();
     cola_ready = list_create();
     cola_ready_multinivel = list_create();
@@ -408,6 +445,7 @@ void iniciar_mutex()
     pthread_mutex_init(&mutex_hilo_exec,NULL);
     pthread_mutex_init(&mutex_cola_io,NULL);
     pthread_mutex_init(&mutex_procesos_sistema,NULL);
+    pthread_mutex_init(&mutex_hilos_sistema,NULL);
     pthread_mutex_init(&mutex_cola_join_wait,NULL);
     pthread_mutex_init(&mutex_cola_dump_memory,NULL);
 }
@@ -427,6 +465,7 @@ void iniciar_hilos()
 void terminar_programa()
 {
     list_destroy(procesos_sistema);
+    list_destroy(hilos_sistema);
     list_destroy(cola_new);
     list_destroy(cola_ready);
     list_destroy(cola_ready_multinivel);
@@ -452,6 +491,7 @@ void liberar_mutex()
 {
     pthread_mutex_destroy(&mutex_procesos_en_new);
     pthread_mutex_destroy(&mutex_procesos_sistema);
+    pthread_mutex_destroy(&mutex_hilos_sistema);
     pthread_mutex_destroy(&mutex_cola_ready);
     pthread_mutex_destroy(&mutex_colas_multinivel);
     pthread_mutex_destroy(&mutex_cola_io);

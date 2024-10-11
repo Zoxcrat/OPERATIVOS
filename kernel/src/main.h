@@ -87,6 +87,7 @@ extern t_log_level LOG_LEVEL;
 // Variables PCBs
 extern int pid_global;
 extern t_list* procesos_sistema;
+extern t_list* hilos_sistema;
 extern t_list* cola_new;
 extern t_list* cola_ready;
 extern t_list* cola_ready_multinivel;
@@ -97,8 +98,10 @@ extern bool io_en_uso;// Estado que indica si el I/O está en uso
 extern TCB* hilo_en_exec;
 extern TCB* hilo_inicial;
 extern int pid_a_buscar; 
-extern bool hilo_desalojado; 
+extern int tid_a_buscar; 
+extern int interrupcion; 
 
+extern bool hilo_desalojado; 
 // Semaforos
 extern sem_t hay_hilos_en_dump_memory;
 extern sem_t verificar_cola_new;
@@ -120,6 +123,7 @@ extern pthread_t* conexion_cpu_interrupt;
 // Mutexs
 extern pthread_mutex_t mutex_procesos_en_new;
 extern pthread_mutex_t mutex_procesos_sistema;
+extern pthread_mutex_t mutex_hilos_sistema;
 extern pthread_mutex_t mutex_cola_ready;
 extern pthread_mutex_t mutex_colas_multinivel;
 extern pthread_mutex_t mutex_cola_io;

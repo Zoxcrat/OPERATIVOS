@@ -26,7 +26,7 @@ void* algoritmo_fifo(void* args) {
     while(1) {
         sem_wait(&hay_hilos_en_ready);
 
-        if(!list_is_empty(cola_ready)){
+        if(!list_is_empty(cola_ready) && hilo_en_exec == NULL){
             pthread_mutex_lock(&mutex_cola_ready);
             TCB* hilo_a_ejecutar = list_remove(cola_ready, 0);
             pthread_mutex_unlock(&mutex_cola_ready);
@@ -47,7 +47,7 @@ void* algoritmo_prioridades(void* args) {
     while(1) {
         sem_wait(&hay_hilos_en_ready);
 
-        if(!list_is_empty(cola_ready)){
+        if(!list_is_empty(cola_ready) && hilo_en_exec == NULL){
         pthread_mutex_lock(&mutex_cola_ready);
         TCB* hilo_con_prioridad = list_get(cola_ready, 0);
         int index_con_prioridad = 0;
@@ -77,30 +77,33 @@ void* algoritmo_colas_multinivel(void* args) {
     while(1) {
         sem_wait(&hay_hilos_en_ready);
 
-        pthread_mutex_lock(&mutex_colas_multinivel);
-        t_cola_multinivel* cola_mayor_prioridad = obtener_cola_con_mayor_prioridad();
-        TCB* hilo_elegido = list_get(cola_mayor_prioridad->cola, 0);
-        list_remove_element(cola_mayor_prioridad->cola, hilo_elegido);
-        pthread_mutex_unlock(&mutex_colas_multinivel);
+        if (hilo_en_exec == NULL){
+            pthread_mutex_lock(&mutex_colas_multinivel);
+            t_cola_multinivel* cola_mayor_prioridad = obtener_cola_con_mayor_prioridad();
+            TCB* hilo_elegido = list_get(cola_mayor_prioridad->cola, 0);
+            list_remove_element(cola_mayor_prioridad->cola, hilo_elegido);
+            pthread_mutex_unlock(&mutex_colas_multinivel);
 
-        time_t tiempo_inicio = time(NULL);
+            time_t tiempo_inicio = time(NULL);
 
-        pthread_mutex_lock(&mutex_socket_dispatch);
-        enviar_hilo_a_cpu(hilo_elegido);
-        pthread_mutex_unlock(&mutex_socket_dispatch);
+            pthread_mutex_lock(&mutex_socket_dispatch);
+            enviar_hilo_a_cpu(hilo_elegido);
+            pthread_mutex_unlock(&mutex_socket_dispatch);
 
-        pthread_mutex_lock(&mutex_log);
-        log_warning(logger, "Se pasa a EXEC el hilo %d del proceso %d", hilo_elegido->TID, hilo_elegido->PID);
-        pthread_mutex_unlock(&mutex_log);
+            pthread_mutex_lock(&mutex_log);
+            log_warning(logger, "Se pasa a EXEC el hilo %d del proceso %d", hilo_elegido->TID, hilo_elegido->PID);
+            pthread_mutex_unlock(&mutex_log);
 
-        while (hilo_elegido->estado == EXEC) {
-            time_t tiempo_actual = time(NULL);
-            double tiempo_transcurrido = difftime(tiempo_actual, tiempo_inicio) * 1000;
-            if (tiempo_transcurrido >= QUANTUM) {
-                sem_post(&mandar_interrupcion);
-                break;
+            while (hilo_elegido->estado == EXEC) {
+                time_t tiempo_actual = time(NULL);
+                double tiempo_transcurrido = difftime(tiempo_actual, tiempo_inicio) * 1000;
+                if (tiempo_transcurrido >= QUANTUM) {
+                    interrupcion = 1;
+                    sem_post(&mandar_interrupcion);
+                    break;
+                }
+                usleep(1000); // 1 ms
             }
-            usleep(1000); // 1 ms
         }
     }
     return NULL;
@@ -168,12 +171,12 @@ void manejar_thread_join(int tid_a_unir) {
     pthread_mutex_lock(&mutex_log);
     log_info(logger_obligatorio, "## (%d:%d) - Bloqueado por: PTHREAD_JOIN", hilo_en_exec->PID,hilo_en_exec->TID);
     pthread_mutex_unlock(&mutex_log);
+
     hilo_desalojado = true;
+
     pthread_mutex_lock(&mutex_hilo_exec);
     hilo_en_exec = NULL;
     pthread_mutex_unlock(&mutex_hilo_exec);
-
-    sem_post(&mandar_interrupcion);
 }
 
 // GESTOR DE QUANTUM
@@ -206,6 +209,7 @@ void *gestor_quantum(void* arg){
                 log_info(logger_obligatorio, "## (%d:%d) - Desalojado por fin de Quantum", hilo_en_exec->PID, hilo_en_exec->TID);
                 pthread_mutex_lock(&mutex_log);
 
+                interrupcion =1;
                 sem_post(&mandar_interrupcion);  // Enviar la interrupción por quantum
             } else {
                 log_info(logger, "El hilo original fue reemplazado, no se envía la interrupción.");
@@ -219,7 +223,6 @@ t_cola_multinivel* obtener_o_crear_cola_con_prioridad(int prioridad_buscada) {
     for (int i = 0; i < list_size(cola_ready_multinivel); i++) {
         t_cola_multinivel* cola = list_get(cola_ready_multinivel, i);
         if (cola->prioridad == prioridad_buscada) {
-            pthread_mutex_unlock(&mutex_colas_multinivel);
             return cola;
         }
     }
@@ -243,7 +246,6 @@ void verificar_eliminacion_cola_multinivel(int prioridad_buscada) {
 }
 
 t_cola_multinivel* obtener_cola_con_mayor_prioridad() {
-    pthread_mutex_lock(&mutex_colas_multinivel); // Bloquear el mutex para proteger el acceso a la lista
     // Si la lista de colas multinivel está vacía, devolver NULL
     if (list_is_empty(cola_ready_multinivel)) {
         pthread_mutex_unlock(&mutex_colas_multinivel); // Desbloquear el mutex antes de devolver
@@ -260,6 +262,5 @@ t_cola_multinivel* obtener_cola_con_mayor_prioridad() {
             cola_con_mayor_prioridad = cola_actual;
         }
     }
-    pthread_mutex_unlock(&mutex_colas_multinivel); // Desbloquear el mutex antes de devolver
     return cola_con_mayor_prioridad;  // Devolver la cola con mayor prioridad
 }
