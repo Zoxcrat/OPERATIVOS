@@ -105,6 +105,15 @@ void* algoritmo_colas_multinivel(void* args) {
                     // Se cumplió el quantum, se debe desalojar el hilo
                     interrupcion = 1;
                     sem_post(&mandar_interrupcion);  // Mandar interrupción por fin de quantum
+
+                    agregar_a_ready(hilo_elegido);
+                    
+                    pthread_mutex_lock(&mutex_hilo_exec);
+                    hilo_en_exec = NULL;  // Limpiar el hilo en ejecución
+                    pthread_mutex_unlock(&mutex_hilo_exec);
+
+                    sem_post(&hay_hilos_en_ready);
+
                     pthread_mutex_lock(&mutex_log);
                     log_info(logger, "El hilo %d del proceso %d fue desalojado por fin de quantum.", hilo_elegido->TID, hilo_elegido->PID);
                     pthread_mutex_unlock(&mutex_log);
@@ -113,10 +122,6 @@ void* algoritmo_colas_multinivel(void* args) {
 
                 usleep(1000);  // Esperar 1 ms antes de la próxima verificación
             }
-
-            pthread_mutex_lock(&mutex_hilo_exec);
-            hilo_en_exec = NULL;  // Limpiar el hilo en ejecución
-            pthread_mutex_unlock(&mutex_hilo_exec);
         }
     }
     return NULL;
