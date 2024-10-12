@@ -60,7 +60,7 @@ void execute();
 int traducir_direccion_logica_a_fisica(int direccion_logica);
 void set_valor_registro(char* registro, uint32_t valor);
 void sumar_registros(char* destino, char* origen);
-t_instruccion string_a_instruccion(char *str);
+op_code string_a_instruccion(char *str);
 void restar_registros(char* destino, char* origen);
 void jnz_registro(char* registro, uint32_t instruccion);
 void log_registro(char* registro);

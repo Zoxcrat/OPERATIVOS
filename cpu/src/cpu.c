@@ -44,10 +44,9 @@ void leer_config()
 }
 
 bool generar_conexiones(){
-	//fd_memoria = crear_conexion2(IP_MEMORIA, PUERTO_MEMORIA);
-	//pthread_create(&conexion_memoria, NULL, (void*) pedir_contexto_a_memoria, (void*) &fd_memoria);
-	//pthread_detach(conexion_memoria);
-    fd_memoria=0;
+	fd_memoria = crear_conexion2(IP_MEMORIA, PUERTO_MEMORIA);
+	pthread_create(&conexion_memoria, NULL, (void*) pedir_contexto_a_memoria, (void*) &fd_memoria);
+	pthread_detach(conexion_memoria);
 
     dispatch_socket = iniciar_servidor(logger, IP_ESCUCHA, PUERTO_ESCUCHA_DISPATCH);
     pthread_create(&hilo_dispatch, NULL, manejar_cliente_dispatch, &dispatch_socket);
@@ -74,8 +73,8 @@ void* manejar_cliente_dispatch() {
         t_list* paquete = recibir_paquete(cliente_socket_dispatch);
 
         op_code codigo_operacion = *(op_code*)list_get(paquete, 0);  // Primer elemento es el codigo_operacion
-        pid_actual = *(int*)list_get(paquete, 1);
-        tid_actual = *(int*)list_get(paquete, 2);
+        pid_actual = atoi(list_get(paquete, 1));
+        tid_actual = atoi(list_get(paquete, 2));
 
         sem_post(&pedir_contexto);
     }
@@ -138,7 +137,12 @@ void cpu_cycle() {
 char* fetch() {
     log_info(logger, "FETCH - Solicitando instrucción PC=%d", contexto->PC);
 
-    enviar_entero(&contexto->PC, fd_memoria);
+    t_paquete* paquete = crear_paquete();
+    agregar_a_paquete(paquete, &pid_actual, sizeof(int));
+    agregar_a_paquete(paquete, &tid_actual, sizeof(int));
+    agregar_a_paquete(paquete, &contexto->PC, sizeof(int));
+    enviar_peticion(paquete,fd_memoria,PROXIMA_INSTRUCCION);
+    eliminar_paquete(paquete);
 
     char* instruccion = recibir_mensaje2(dispatch_socket,logger);
 
@@ -235,7 +239,7 @@ void execute() {
             restar_registros(instruccion_actual->parametro1, instruccion_actual->parametro2);
             break;
         case JNZ:
-            jnz_registro(instruccion_actual->parametro1, instruccion_actual->parametro2);
+            jnz_registro(instruccion_actual->parametro1, atoi(instruccion_actual->parametro2));
             break;
         case LOG:
             log_registro(instruccion_actual->parametro1);
@@ -346,7 +350,7 @@ void execute() {
     }
 }
 
-t_instruccion string_a_instruccion(char *str) {
+op_code string_a_instruccion(char *str) {
     if (strcmp(str, "SET") == 0) return SET;
     if (strcmp(str, "READ_MEM") == 0) return READ_MEM;
     if (strcmp(str, "WRITE_MEM") == 0) return WRITE_MEM;
@@ -673,5 +677,4 @@ void terminar_programa(){
 	config_destroy(config);
     sem_destroy(&pedir_contexto);
     sem_destroy(&verificar_interrupcion);
-    free(conexion_memoria);
 }

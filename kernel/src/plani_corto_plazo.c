@@ -74,20 +74,21 @@ void* algoritmo_prioridades(void* args) {
 }
 
 void* algoritmo_colas_multinivel(void* args) {
-    while(1) {
-        sem_wait(&hay_hilos_en_ready);
+    while (1) {
+        sem_wait(&hay_hilos_en_ready);  // Esperar hasta que haya hilos listos
 
-        if (hilo_en_exec == NULL){
+        if (hilo_en_exec == NULL) {
             pthread_mutex_lock(&mutex_colas_multinivel);
             t_cola_multinivel* cola_mayor_prioridad = obtener_cola_con_mayor_prioridad();
             TCB* hilo_elegido = list_get(cola_mayor_prioridad->cola, 0);
             list_remove_element(cola_mayor_prioridad->cola, hilo_elegido);
             pthread_mutex_unlock(&mutex_colas_multinivel);
 
-            time_t tiempo_inicio = time(NULL);
+            struct timespec tiempo_inicio, tiempo_actual;
+            clock_gettime(CLOCK_MONOTONIC, &tiempo_inicio);  // Obtener tiempo de inicio
 
             pthread_mutex_lock(&mutex_socket_dispatch);
-            enviar_hilo_a_cpu(hilo_elegido);
+            enviar_hilo_a_cpu(hilo_elegido);  // Enviar el hilo a la CPU para que sea ejecutado
             pthread_mutex_unlock(&mutex_socket_dispatch);
 
             pthread_mutex_lock(&mutex_log);
@@ -95,15 +96,27 @@ void* algoritmo_colas_multinivel(void* args) {
             pthread_mutex_unlock(&mutex_log);
 
             while (hilo_elegido->estado == EXEC) {
-                time_t tiempo_actual = time(NULL);
-                double tiempo_transcurrido = difftime(tiempo_actual, tiempo_inicio) * 1000;
+                // Control del quantum
+                clock_gettime(CLOCK_MONOTONIC, &tiempo_actual);  // Obtener el tiempo actual
+                double tiempo_transcurrido = (tiempo_actual.tv_sec - tiempo_inicio.tv_sec) * 1000 +
+                                             (tiempo_actual.tv_nsec - tiempo_inicio.tv_nsec) / 1000000.0;
+
                 if (tiempo_transcurrido >= QUANTUM) {
+                    // Se cumplió el quantum, se debe desalojar el hilo
                     interrupcion = 1;
-                    sem_post(&mandar_interrupcion);
+                    sem_post(&mandar_interrupcion);  // Mandar interrupción por fin de quantum
+                    pthread_mutex_lock(&mutex_log);
+                    log_info(logger, "El hilo %d del proceso %d fue desalojado por fin de quantum.", hilo_elegido->TID, hilo_elegido->PID);
+                    pthread_mutex_unlock(&mutex_log);
                     break;
                 }
-                usleep(1000); // 1 ms
+
+                usleep(1000);  // Esperar 1 ms antes de la próxima verificación
             }
+
+            pthread_mutex_lock(&mutex_hilo_exec);
+            hilo_en_exec = NULL;  // Limpiar el hilo en ejecución
+            pthread_mutex_unlock(&mutex_hilo_exec);
         }
     }
     return NULL;
@@ -124,11 +137,6 @@ void enviar_hilo_a_cpu(TCB* hilo)
     agregar_a_paquete(paquete, &(hilo->TID), sizeof(int));
     enviar_peticion(paquete, fd_cpu_dispatch, EJECUTAR_HILO);
     eliminar_paquete(paquete);
-
-    if (ALGORITMO_PLANIFICACION == COLAS_MULTINIVEL) {
-        iniciar_temporizador_quantum();
-        hilo_inicial = hilo;  // Guardar el hilo original que está en ejecución
-    }
 }
 
 void agregar_a_ready(TCB* tcb){
@@ -178,55 +186,26 @@ void manejar_thread_join(int tid_a_unir) {
     hilo_en_exec = NULL;
     pthread_mutex_unlock(&mutex_hilo_exec);
 }
-
-// GESTOR DE QUANTUM
-
-
 /// FUNCIONES PARA ALROGIRMTO COLAS MULTINIVEL
 
-void iniciar_temporizador_quantum() {
-    hilo_desalojado = false;  // Reiniciar la variable de control de desalojo
-    sem_post(&comenzar_quantum);  // Iniciar el temporizador
-}
-
-void inicializar_gestor_quantum()
-{
-    pthread_create(hilo_gestor_quantum, NULL, gestor_quantum, NULL);
-    pthread_detach(*hilo_gestor_quantum);
-}
-
-void *gestor_quantum(void* arg){
-    while (1) {
-        sem_wait(&comenzar_quantum);
-
-        usleep(QUANTUM * 1000);  // Dormir por el tiempo del quantum en milisegundos
-
-        pthread_mutex_lock(&mutex_hilo_exec);
-        if (!hilo_desalojado && hilo_en_exec != NULL && hilo_en_exec->estado == EXEC) {
-            // Verificar si el hilo que sigue en ejecución es el mismo que el hilo inicial
-            if (hilo_en_exec == hilo_inicial) {
-                pthread_mutex_lock(&mutex_log);
-                log_info(logger_obligatorio, "## (%d:%d) - Desalojado por fin de Quantum", hilo_en_exec->PID, hilo_en_exec->TID);
-                pthread_mutex_lock(&mutex_log);
-
-                interrupcion =1;
-                sem_post(&mandar_interrupcion);  // Enviar la interrupción por quantum
-            } else {
-                log_info(logger, "El hilo original fue reemplazado, no se envía la interrupción.");
-            }
-        }
-        pthread_mutex_unlock(&mutex_hilo_exec);
-    }
-}
-   
 t_cola_multinivel* obtener_o_crear_cola_con_prioridad(int prioridad_buscada) {
+    // Buscar una cola existente con la prioridad buscada
     for (int i = 0; i < list_size(cola_ready_multinivel); i++) {
         t_cola_multinivel* cola = list_get(cola_ready_multinivel, i);
         if (cola->prioridad == prioridad_buscada) {
             return cola;
         }
     }
-    return NULL;
+
+    // Si no se encontró ninguna, crear una nueva cola
+    t_cola_multinivel* nueva_cola = malloc(sizeof(t_cola_multinivel));
+    nueva_cola->cola = list_create();  // Crear la lista para almacenar hilos
+    nueva_cola->prioridad = prioridad_buscada;
+
+    // Agregar la nueva cola a la lista de colas multinivel
+    list_add(cola_ready_multinivel, nueva_cola);
+
+    return nueva_cola;
 }
 
 void verificar_eliminacion_cola_multinivel(int prioridad_buscada) {

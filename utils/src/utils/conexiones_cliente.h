@@ -26,11 +26,9 @@ typedef enum
 	ACTUALIZAR_CONTEXTO,
 	OBTENER_INSTRUCCION,
 	ESCRIBIR_MEMORIA, // WRITE MEM
-	LEER_MEMORIA	  // READ MEM
-} op_code;
-
-typedef enum
-{
+	LEER_MEMORIA,	  // READ MEM
+	PROXIMA_INSTRUCCION,
+	//
 	SET,
 	READ_MEM,
 	WRITE_MEM,
@@ -49,12 +47,12 @@ typedef enum
 	MUTEX_UNLOCK,
 	DUMP_MEMORY,
 	IO,
-	SEGMENTATION_FAULT
-} t_instruccion;
+	SEGMENTATION_FAULT,
+} op_code;
 
 typedef struct t_instruccion
 {
-	t_instruccion instruccion;
+	op_code instruccion;
 	char *parametro1;
 	char *parametro2;
 	char *parametro3;

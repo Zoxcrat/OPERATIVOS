@@ -110,9 +110,6 @@ int main(int argc, char **argv)
     //inicializar_plani_corto_plazo();
     //inicializar_gestor_io();
     //inicializar_gestor_dump_memory();
-    if (ALGORITMO_PLANIFICACION == COLAS_MULTINIVEL){
-        inicializar_gestor_quantum();
-    }
 
     crear_proceso(archivo_pseudocodigo, tamanio_proceso, 0);
 
@@ -174,9 +171,30 @@ bool generar_conexiones(){
 
 void procesar_conexion_cpu_dispatch() {
     while (1) {
-        t_instruccion_completa* syscall;
+        t_instruccion_completa* syscall = malloc(sizeof(t_instruccion_completa));
 
-        recibir_mensaje(fd_cpu_dispatch, logger);
+        t_list* paquete = recibir_paquete(fd_cpu_dispatch);
+
+        int cantidad_parametros = *(int*)list_get(paquete, list_size(paquete) - 1);
+
+        // Obtener el código de operación
+        syscall->instruccion = *(op_code*)list_get(paquete, 0);  // Primer elemento es el codigo_operacion
+
+        // Inicializar los parámetros a valores por defecto
+        syscall->parametro1 = NULL;
+        syscall->parametro2 = NULL;
+        syscall->parametro3 = NULL;
+
+        // Cargar los parámetros según la cantidad recibida
+        if (cantidad_parametros >= 1) {
+            syscall->parametro1 = list_get(paquete, 1);
+        }
+        if (cantidad_parametros >= 2) {
+            syscall->parametro2 = list_get(paquete, 2);
+        }
+        if (cantidad_parametros >= 3) {
+            syscall->parametro3 = list_get(paquete, 3);
+        }
 
         // Procesar la syscall según el código recibido
         switch (syscall->instruccion) {
