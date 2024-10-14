@@ -15,6 +15,8 @@ int main(int argc, char **argv) {
     }
     leer_config();
 
+    inicializar_filesystem();
+
     filesystem_socket = iniciar_servidor(logger, IP_ESCUCHA, PUERTO_ESCUCHA);
     if (filesystem_socket == -1) {
         log_error(logger, "Error al iniciar el servidor del Filesystem");
@@ -67,7 +69,6 @@ void* procesar_peticion(void* arg) {
     
     // Simular el retardo de acceso a bloque
     sleep(RETARDO_ACCESO_BLOQUE);
-	
     // Aca se implementa la lógica de procesamiento según el op_code
 
     // Manejar la solicitud del cliente
