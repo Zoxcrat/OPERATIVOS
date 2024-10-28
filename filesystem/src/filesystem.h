@@ -44,7 +44,7 @@ typedef struct {
 
 
 // Buffer para el bitarray  ???
-char bitmap_buffer[BITMAP_SIZE];
+char *bitmap_buffer;
 
 t_bitarray *bitarray;
 
@@ -53,6 +53,10 @@ void leer_config();
 void* procesar_conexion(void* arg);
 void* procesar_peticion(void* arg);
 void terminar_programa();
+
+void init_bitarray() {
+    bitarray = bitarray_create_with_mode(bitmap_buffer, BITMAP_SIZE, LSB_FIRST);
+}
 
 void inicializar_filesystem() {
     // Abrir o crear el archivo bitmap.dat
@@ -92,9 +96,7 @@ void inicializar_filesystem() {
     }
 }
 
-void init_bitarray() {
-    bitarray = bitarray_create_with_mode(bitmap_buffer, BITMAP_SIZE, LSB_FIRST);
-}
+
 
 void destroy_bitarray() {
     bitarray_destroy(bitarray);
@@ -127,10 +129,10 @@ void liberar_bloque(int block_num) {
 
 }
 // Escribe datos en un bloque del archivo bloques.dat
-void escribir_bloque(int block_num, const void *data) {
+void escribir_bloque(int block_num, const void *data, size_t bytes_a_escribir) {
     fseek(blocks_file, block_num * BLOCK_SIZE, SEEK_SET);
-    fwrite(data, BLOCK_SIZE, 1, blocks_file);
-    fflush(blocks_file);  // Asegura que los datos se escriban
+    fwrite(data, bytes_a_escribir, 1, blocks_file);  // Escribe solo los bytes necesarios
+    fflush(blocks_file);  // Asegura que los datos se escriban en el disco
 }
 
 void crear_archivo_metadata(const char* nombre_archivo, int tamaño_archivo, int bloque_indice) {
@@ -149,5 +151,80 @@ void crear_archivo_metadata(const char* nombre_archivo, int tamaño_archivo, int
     fclose(metadata_file);
     log_info(logger, "Archivo de metadata creado: %s", path_metadata);
 }
+
+int calcular_bloques_libres() {
+    int bloques_libres = 0;
+    for (int i = 0; i < BLOCK_COUNT; i++) {
+        if (!bitarray_test_bit(bitarray, i)) {
+            bloques_libres++;
+        }
+    }
+    return bloques_libres;
+}
+
+void crear_archivo_dump(const char* nombre_archivo, const void* contenido, size_t tamanio_archivo) {
+    int bloques_necesarios = (tamanio_archivo + BLOCK_SIZE - 1) / BLOCK_SIZE; // Calcula bloques necesarios (redondeo hacia arriba)
+    
+    pthread_mutex_lock(&fs_lock);
+    if (!hay_bloques_libres(bloques_necesarios + 1)) {
+        pthread_mutex_unlock(&fs_lock);  
+        log_error(logger, "No hay bloques suficientes para crear el archivo: %s", nombre_archivo);
+        return;
+    }
+
+    // Reservar bloque de índice
+    int bloque_indice = buscar_bloque_libre();
+    if (bloque_indice == -1) {
+        pthread_mutex_unlock(&fs_lock);  
+        log_error(logger, "Error al asignar bloque de índice para el archivo: %s", nombre_archivo);
+        return;
+    }
+
+    log_info(logger, "## Bloque asignado: %d - Archivo: %s - Bloques Libres: %d", 
+             bloque_indice, nombre_archivo, calcular_bloques_libres());
+
+    int bloques_datos[bloques_necesarios];
+    for (int i = 0; i < bloques_necesarios; i++) {
+        bloques_datos[i] = buscar_bloque_libre();
+        if (bloques_datos[i] == -1) {
+            log_error(logger, "Error al asignar bloque de datos para el archivo: %s", nombre_archivo);
+            // Liberar cualquier bloque ya asignado y el bloque de índice
+            liberar_bloque(bloque_indice);
+            for (int j = 0; j < i; j++) {
+                liberar_bloque(bloques_datos[j]);
+            }
+            pthread_mutex_unlock(&fs_lock);  
+            return;
+        }
+        log_info(logger, "## Bloque asignado: %d - Archivo: %s - Bloques Libres: %d", 
+                 bloques_datos[i], nombre_archivo, calcular_bloques_libres());
+    }
+
+    // Actualizar bloque de índice con punteros a bloques de datos
+    fseek(blocks_file, bloque_indice * BLOCK_SIZE, SEEK_SET);
+    fwrite(bloques_datos, sizeof(int), bloques_necesarios, blocks_file);
+    fflush(blocks_file);
+
+    log_info(logger, "## Acceso Bloque - Archivo: %s - Tipo Bloque: ÍNDICE - Bloque File System %d", 
+             nombre_archivo, bloque_indice);
+
+    // Escribir contenido en cada bloque de datos
+    for (int i = 0; i < bloques_necesarios; i++) {
+        size_t bytes_a_escribir = (i == bloques_necesarios - 1) ? tamanio_archivo % BLOCK_SIZE : BLOCK_SIZE;
+        escribir_bloque(bloques_datos[i], contenido + i * BLOCK_SIZE, bytes_a_escribir);
+        
+        log_info(logger, "## Acceso Bloque - Archivo: %s - Tipo Bloque: DATOS - Bloque File System %d", 
+                 nombre_archivo, bloques_datos[i]);
+
+        usleep(RETARDO_ACCESO_BLOQUE * 1000);  // RETARDO_ACCESO_BLOQUE en milisegundos
+    }
+
+    pthread_mutex_unlock(&fs_lock); 
+
+    crear_archivo_metadata(nombre_archivo, tamanio_archivo, bloque_indice);
+    log_info(logger, "## Archivo Creado: %s - Tamaño: %zu", nombre_archivo, tamanio_archivo);
+    log_info(logger, "## Fin de solicitud - Archivo: %s", nombre_archivo);
+}
+
 
 #endif

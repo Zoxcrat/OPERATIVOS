@@ -10,7 +10,7 @@ int main(int argc, char **argv) {
 
     config = config_create("src/filesystem.config");
     if (config == NULL) {
-        log_error(logger, "No se encontró el archivo :(");
+        log_error(logger, "No se encontró el archivo :");
         exit(1);
     }
     leer_config();
@@ -69,6 +69,7 @@ void* procesar_peticion(void* arg) {
     
     // Simular el retardo de acceso a bloque
     sleep(RETARDO_ACCESO_BLOQUE);
+    enviar_mensaje("OK",socket_cliente);
     // Aca se implementa la lógica de procesamiento según el op_code
 
     // Manejar la solicitud del cliente
