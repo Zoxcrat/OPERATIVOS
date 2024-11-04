@@ -1,15 +1,30 @@
 #include "../include/mem_cpu.h"
 
+int proceso_buscado_cpu;
+
 bool coincidePid(t_proceso *proceso)
 {
-    return (proceso->pid == proceso_buscado);
+    return (proceso->pid == proceso_buscado_cpu);
+}
+
+t_hilo *obtener_hilo(int pid, int tid)
+{
+    proceso_buscado_cpu = pid;
+    t_proceso *proceso = list_find(lista_procesos_en_memoria, (void *)coincidePid);
+    t_hilo *hilo = list_get(proceso->lista_hilos, tid);
+
+    if (!hilo)
+    {
+        log_error(logger, "NO SE ENCONTRO EL HILO BUSCADO.");
+        exit(EXIT_FAILURE);
+    }
+    return hilo;
 }
 
 t_contexto_ejecucion *obtener_contexto(int pid, int tid)
 {
-    // Atajar errores si no encuentra algo de esto que esta abajo.
-    t_proceso *proceso = list_find(lista_procesos_en_memoria, (void *)coincidePid);
-    t_hilo *hilo = list_get(proceso->lista_hilos, tid);
+
+    t_hilo *hilo = obtener_hilo(pid, tid);
 
     t_contexto_ejecucion *contexto_completo = malloc(sizeof(t_contexto_ejecucion));
     contexto_completo->base = proceso->contexto->base;
@@ -25,6 +40,14 @@ t_contexto_ejecucion *obtener_contexto(int pid, int tid)
     contexto_completo->PC = hilo->registros->PC;
 
     return contexto_completo;
+}
+
+respuesta_pedido actualizar_contexto(int pid, int tid, t_registros_cpu *nuevo_contexto)
+{
+    t_hilo *hilo = obtener_hilo(pid, tid);
+    t_registros_cpu registros_hilo = hilo->registros;
+    registros_hilo = nuevo_contexto;
+    return OK;
 }
 
 void atender_cpu()
