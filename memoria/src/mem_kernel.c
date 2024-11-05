@@ -97,8 +97,26 @@ int crear_proceso(int pid, int tamanio)
     return EXIT_SUCCESS;
 }
 
+void destruir_hilo(t_hilo *hilo)
+{
+    free(hilo->tid);
+    free(hilo->registros);
+    list_destroy_and_destroy_elements(hilo->lista_instrucciones, (void *)free);
+}
+
+void destruir_proceso(t_proceso *proceso)
+{
+    free(proceso->pid);
+    free(proceso->contexto);
+    list_destroy_and_destroy_elements(proceso->lista_hilos, (void *)destruir_hilo);
+}
+
 respuesta_pedido finalizar_proceso(int pid)
 {
+    t_proceso *proceso = obtener_proceso(pid);
+    list_remove_element(lista_procesos_en_memoria, proceso);
+    destruir_proceso(proceso); // Libera la memoria utilizada por la estructura del proceso.
+    return OK;
 }
 
 int crear_hilo(int pid, char *archivo_de_pseudocodigo)
@@ -115,6 +133,26 @@ int crear_hilo(int pid, char *archivo_de_pseudocodigo)
 
     log_info(logger, "HILO CREADO EXITOSAMENTE PARA PID: %d CON TID: %d", proceso->pid, nuevo_hilo->tid);
     return EXIT_SUCCESS;
+}
+
+void *read_mem(int base)
+{
+    void *inicio_lectura = memoria_usuario + sizeof(char) * 4;
+    void *contenido = malloc(sizeof(char) * 4);
+    if (!contenido)
+    {
+        log_error(logger, "NO SE PUDO RESERVAR MEMORIA PARA LA LECTURA.");
+        exit(EXIT_FAILURE);
+    }
+    memcpy(contenido, inicio_lectura, sizeof(char) * 4);
+    return contenido;
+}
+
+respuesta_pedido write_mem(int base, void *contenido_escritura)
+{
+    void *inicio_lectura = memoria_usuario + sizeof(char) * 4;
+    memcpy(inicio_lectura, contenido_escritura, sizeof(char) * 4);
+    return OK;
 }
 
 void atender_kernel()
