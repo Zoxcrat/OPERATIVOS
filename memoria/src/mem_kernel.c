@@ -45,15 +45,8 @@ void inicializar_registros(t_registros_cpu *registros)
     registros->PC = 0;
 }
 
-// Por ahora, solamente esta contemplado el esquema de particiones fijas. Esta funcion sigue una logica best-fit.
-int asignar_memoria(int tamanio, t_proceso *proceso)
+t_particion *encontrar_particion_bestfit(int tamanio)
 {
-    if (tamanio <= 0)
-    {
-        log_error(logger, "INGRESE UN VALOR MAYOR A CERO PARA ASIGNAR MEMORIA.");
-        return -1;
-    }
-
     t_particion *particion_elegida = NULL;
     for (int i = 0; i < list_size(lista_particiones); i++)
     {
@@ -65,20 +58,71 @@ int asignar_memoria(int tamanio, t_proceso *proceso)
             particion_elegida = particion_actual;
         }
     }
+    return particion_elegida;
+}
 
-    if (particion_elegida)
+void asignar_memoria_estatica(t_proceso *proceso, t_particion *particion_elegida)
+{
+    particion_elegida->libre = false;
+    proceso->contexto->base = particion_elegida->base;
+    proceso->contexto->limite = particion_elegida->tamanio;
+    log_info(logger, "PARTICION ASIGNADA A PROCESO CON PID: %d, NUMERO: %d / TAMANIO PEDIDO: %d / TAMANIO DE LA PARTICION: %d", proceso->pid, particion_elegida->orden, tamanio, particion_elegida->tamanio);
+}
+
+void asignar_memoria_dinamica(t_proceso *proceso, t_particion *particion_original, int tamanio_pedido)
+{
+    // Creo una particion con el tamanio adecuado
+    t_particion *particion_nueva = malloc(sizeof(t_particion));
+    particion_nueva->base = particion_original->base;
+    particion_nueva->tamanio = tamanio_pedido;
+    particion_nueva->libre = false;
+    particion_nueva->orden = NULL;
+
+    list_add(lista_particiones, particion_nueva);
+
+    // Si en la particion original no va a quedar espacio, la borro de la lista y la libero.
+    if (particion_original->tamanio == tamanio_pedido)
     {
-        particion_elegida->libre = false;
-        proceso->contexto->base = particion_elegida->base;
-        proceso->contexto->limite = particion_elegida->tamanio;
-        log_info(logger, "PARTICION ASIGNADA A PROCESO CON PID: %d, NUMERO: %d / TAMANIO PEDIDO: %d / TAMANIO DE LA PARTICION: %d", proceso->pid, particion_elegida->orden, tamanio, particion_elegida->tamanio);
-        return 0;
+        list_remove_element(lista_particiones, particion_original);
+        free(particion_original);
+    }
+
+    // Resto el tamanio que ocupe y muevo el puntero a la base tantos bytes como haya solicitado el proceso.
+    particion_original->tamanio -= tamanio_pedido;
+    particion_original->base += tamanio_pedido;
+
+    proceso->contexto->base = particion_nueva->base;
+    proceso->contexto->limite = particion_nueva->tamanio;
+    log_info(logger, "PARTICION ASIGNADA A PROCESO CON PID: %d, NUMERO: %d / TAMANIO PEDIDO: %d / TAMANIO DE LA PARTICION: %d", proceso->pid, particion_nueva->orden, tamanio_pedido, particion_nueva->tamanio);
+}
+
+// Por ahora, solamente esta contemplado el esquema de particiones fijas. Esta funcion sigue una logica best-fit.
+int asignar_memoria(int tamanio, t_proceso *proceso)
+{
+    if (tamanio <= 0)
+    {
+        log_error(logger, "INGRESE UN VALOR MAYOR A CERO PARA ASIGNAR MEMORIA.");
+        return -1;
+    }
+
+    t_particion *particion_elegida = encontrar_particion_bestfit(tamanio);
+
+    if (!particion_elegida)
+    {
+        log_error(logger, "NO SE PUDO ASIGNAR LA MEMORIA AL PROCESO %d", proceso->pid);
+        return -1;
+    }
+
+    if (strcmp(ESQUEMA, "FIJAS"))
+    {
+        asignar_memoria_estatica(proceso, particion_elegida);
     }
     else
     {
-        log_error(logger, "NO SE PUDO ASIGNAR LA MEMORIA.");
-        return -1;
+        asignar_memoria_dinamica(proceso, particion_elegida, tamanio);
     }
+
+    return 0;
 }
 
 int crear_proceso(int pid, int tamanio)
