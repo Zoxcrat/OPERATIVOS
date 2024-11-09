@@ -7,7 +7,7 @@ bool coincidePid(t_proceso *proceso)
     return (proceso->pid == proceso_buscado_kernel);
 }
 
-t_proceso *obtener_proceso(pid)
+t_proceso *obtener_proceso(int pid)
 {
     proceso_buscado_kernel = pid;
     t_proceso *proceso = list_find(lista_procesos_en_memoria, (void *)coincidePid);
@@ -163,7 +163,7 @@ respuesta_pedido finalizar_proceso(int pid)
     return OK;
 }
 
-int crear_hilo(int pid, char *archivo_de_pseudocodigo)
+respuesta_pedido crear_hilo(int pid, char *archivo_de_pseudocodigo)
 {
     t_proceso *proceso = obtener_proceso(pid);
     t_hilo *nuevo_hilo = malloc(sizeof(t_hilo));
@@ -175,8 +175,23 @@ int crear_hilo(int pid, char *archivo_de_pseudocodigo)
     list_add(proceso->lista_hilos, nuevo_hilo);
     leer_archivo_pseudocodigo(archivo_de_pseudocodigo, nuevo_hilo->lista_instrucciones);
 
+    if (!nuevo_hilo)
+    {
+        log_error("Error en la creacion del hilo para el proceso %d", pid);
+        return ERROR;
+    }
+
     log_info(logger, "HILO CREADO EXITOSAMENTE PARA PID: %d CON TID: %d", proceso->pid, nuevo_hilo->tid);
-    return EXIT_SUCCESS;
+    return OK;
+}
+
+respuesta_pedido finalizar_hilo(int pid, int tid)
+{
+    t_proceso *proceso = obtener_proceso(pid);
+    t_hilo *hilo = obtener_hilo(pid, tid);
+    list_remove_element(proceso->lista_hilos, hilo);
+    destruir_hilo(hilo);
+    return OK;
 }
 
 void *read_mem(int base)
@@ -199,6 +214,16 @@ respuesta_pedido write_mem(int base, void *contenido_escritura)
     return OK;
 }
 
+void agregar_respuesta_enviar_paquete(t_paquete *paquete, respuesta_pedido respuesta)
+{
+    agregar_a_paquete(paquete, (void *)respuesta, sizeof(respuesta_pedido));
+    enviar_paquete(paquete, fd_kernel);
+}
+
+// ----------------------------------------
+// CICLO DE ATENCION DE PROCESOS DEL KERNEL
+// ----------------------------------------
+
 void atender_kernel()
 {
     // Cuando llega una peticion del Kernel, se crea un hilo nuevo y se le delega el trabajo     bool control_key = 1;
@@ -209,24 +234,42 @@ void atender_kernel()
     {
         int cod_op = recibir_operacion(fd_kernel);
         recibir_entero(fd_kernel);
-        int pid;
-        int tid;
+        int pid = recibir_entero(fd_kernel);
+        respuesta_pedido respuesta;
         t_paquete *paquete;
         switch (cod_op)
         {
         case INICIALIZAR_PROCESO:
-            pid = recibir_entero(fd_kernel);
-            tid = recibir_entero(fd_kernel);
+            int tamanio = recibir_entero(fd_kernel);
+            respuesta = crear_proceso(pid, tamanio);
+            sleep(RETARDO_RESPUESTA);
+            agregar_respuesta_enviar_paquete(paquete, respuesta);
             break;
         case FINALIZACION_PROCESO:
+            respuesta = finalizar_proceso(pid);
+            sleep(RETARDO_RESPUESTA);
+            agregar_respuesta_enviar_paquete(paquete, respuesta);
             break;
         case CREACION_HILO:
+            int tid = recibir_entero(fd_kernel);
+            int tamanio = recibir_entero(fd_kernel);
+            char *nombre_archivo = malloc(tamanio);
+            recibir_buffer(nombre_archivo, tamanio);
+            respuesta = crear_hilo(pid, nombre_archivo);
+            sleep(RETARDO_RESPUESTA);
+            agregar_respuesta_enviar_paquete(paquete, respuesta);
             break;
         case FINALIZACION_HILO:
+            int tid = recibir_entero(fd_kernel);
+            respuesta = finalizar_hilo(pid, tid);
+            sleep(RETARDO_RESPUESTA);
+            agregar_respuesta_enviar_paquete(paquete, respuesta);
+            break;
+        case EXIT:
+            control_key = 0;
             break;
         default:
             log_error(logger, "No se entendio la operacion del Kernel");
-            control_key = 0;
         }
     }
 }

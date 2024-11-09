@@ -48,6 +48,7 @@ typedef enum
 	DUMP_MEMORY,
 	IO,
 	SEGMENTATION_FAULT,
+	EXIT
 } op_code;
 
 typedef struct t_instruccion
@@ -83,7 +84,7 @@ typedef struct
 	t_buffer *buffer;
 } t_paquete;
 
-void enviar_contexto(t_contexto_ejecucion* contexto, int socket_cliente);
+void enviar_contexto(t_contexto_ejecucion *contexto, int socket_cliente);
 /**
  * @fn crear_conexion
  * @brief
