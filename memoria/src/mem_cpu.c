@@ -50,6 +50,40 @@ respuesta_pedido actualizar_contexto(int pid, int tid, t_registros_cpu *nuevo_co
     return OK;
 }
 
+void agregar_respuesta_enviar_paquete(t_paquete *paquete, respuesta_pedido respuesta)
+{
+    agregar_a_paquete(paquete, (void *)respuesta, sizeof(respuesta_pedido));
+    enviar_paquete(paquete, fd_kernel);
+}
+
+char *obtener_instruccion(int pid, int tid)
+{
+    t_hilo *hilo = obtener_hilo(pid, tid);
+    int program_counter = hilo->registros->PC;
+    char *instruccion = list_get(hilo->lista_instrucciones, program_counter);
+    return instruccion;
+}
+
+void *read_mem(int base)
+{
+    void *inicio_lectura = memoria_usuario + base;
+    void *contenido = malloc(sizeof(char) * 4);
+    if (!contenido)
+    {
+        log_error(logger, "NO SE PUDO RESERVAR MEMORIA PARA LA LECTURA.");
+        exit(EXIT_FAILURE);
+    }
+    memcpy(contenido, inicio_lectura, sizeof(char) * 4);
+    return contenido;
+}
+
+respuesta_pedido write_mem(int base, void *contenido_escritura)
+{
+    void *inicio_lectura = memoria_usuario + base;
+    memcpy(inicio_lectura, contenido_escritura, sizeof(char) * 4);
+    return OK;
+}
+
 void atender_cpu()
 {
 
@@ -60,26 +94,47 @@ void atender_cpu()
     {
         int cod_op = recibir_operacion(fd_cpu);
         recibir_entero(fd_cpu);
-        int pid;
+        int pid = recibir_entero(fd_cpu);
         int tid;
         t_paquete *paquete;
+        respuesta_pedido respuesta;
         switch (cod_op)
         {
         case PEDIDO_CONTEXTO:
-            pid = recibir_entero(fd_cpu);
             tid = recibir_entero(fd_cpu);
             t_contexto_ejecucion *contexto = obtener_contexto(pid, tid);
             agregar_a_paquete(paquete, PEDIDO_CONTEXTO, sizeof(op_code));
             agregar_a_paquete(paquete, (void *)contexto, sizeof(t_contexto_ejecucion));
+            sleep(RETARDO_RESPUESTA);
             enviar_paquete(fd_cpu);
             break;
         case ACTUALIZAR_CONTEXTO:
+            tid = recibir_entero(fd_cpu);
+            t_registros_cpu *contexto = recibir_contexto(fd_cpu);
+            respuesta = actualizar_contexto(pid, tid, contexto);
+            sleep(RETARDO_RESPUESTA);
+            agregar_respuesta_enviar_paquete(paquete, respuesta);
             break;
         case OBTENER_INSTRUCCION:
+            tid = recibir_entero(fd_cpu);
+            char *instruccion = obtener_instruccion(pid, tid);
+            agregar_a_paquete(paquete, (void *)instruccion, strlen(instruccion));
+            sleep(RETARDO_RESPUESTA);
+            enviar_paquete(fd_cpu);
             break;
         case ESCRIBIR_MEMORIA:
+            int base = recibir_entero(fd_cpu);
+            void *contenido = recibir_buffer(fd_cpu, sizeof(char) * 4);
+            respuesta = write_mem(base, contenido);
+            sleep(RETARDO_RESPUESTA);
+            agregar_respuesta_enviar_paquete(paquete, respuesta);
             break;
         case LEER_MEMORIA:
+            int base = recibir_entero(fd_cpu);
+            void *contenido = read_mem(base);
+            agregar_a_paquete(paquete, contenido, sizeof(char) * 4);
+            sleep(RETARDO_RESPUESTA);
+            enviar_paquete(paquete, fd_cpu);
             break;
         default:
             log_error(logger, "La CPU no entendio la operacion.");

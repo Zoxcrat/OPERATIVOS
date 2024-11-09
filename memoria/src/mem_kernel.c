@@ -194,26 +194,6 @@ respuesta_pedido finalizar_hilo(int pid, int tid)
     return OK;
 }
 
-void *read_mem(int base)
-{
-    void *inicio_lectura = memoria_usuario + sizeof(char) * 4;
-    void *contenido = malloc(sizeof(char) * 4);
-    if (!contenido)
-    {
-        log_error(logger, "NO SE PUDO RESERVAR MEMORIA PARA LA LECTURA.");
-        exit(EXIT_FAILURE);
-    }
-    memcpy(contenido, inicio_lectura, sizeof(char) * 4);
-    return contenido;
-}
-
-respuesta_pedido write_mem(int base, void *contenido_escritura)
-{
-    void *inicio_lectura = memoria_usuario + sizeof(char) * 4;
-    memcpy(inicio_lectura, contenido_escritura, sizeof(char) * 4);
-    return OK;
-}
-
 void agregar_respuesta_enviar_paquete(t_paquete *paquete, respuesta_pedido respuesta)
 {
     agregar_a_paquete(paquete, (void *)respuesta, sizeof(respuesta_pedido));

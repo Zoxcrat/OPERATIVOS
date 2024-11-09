@@ -69,12 +69,12 @@ void recibir_mensaje(int socket_cliente, t_log *logger)
     log_info(logger, "Me llego el mensaje %s", buffer);
     free(buffer);
 }
-char* recibir_mensaje2(int socket_cliente, t_log *logger)
+char *recibir_mensaje2(int socket_cliente, t_log *logger)
 {
     int size;
     char *buffer = recibir_buffer(&size, socket_cliente);
     log_info(logger, "Me llego el mensaje %s", buffer);
-    return buffer;  // Retorna el buffer en lugar de liberarlo
+    return buffer; // Retorna el buffer en lugar de liberarlo
 }
 t_list *recibir_paquete(int socket_cliente)
 {
@@ -94,13 +94,13 @@ t_list *recibir_paquete(int socket_cliente)
     return valores;
 }
 
-t_contexto_ejecucion* recibir_contexto(int socket_cliente) {
+t_registros_cpu *recibir_contexto(int socket_cliente)
+{
     // Reservamos memoria para recibir la estructura
-    t_contexto_ejecucion *contexto = malloc(sizeof(t_contexto_ejecucion));
-    
+    t_registros_cpu *contexto = malloc(sizeof(t_registros_cpu));
+
     // Recibimos el contexto desde el socket
-    recv(socket_cliente, contexto, sizeof(t_contexto_ejecucion), MSG_WAITALL);
-    
+    recv(socket_cliente, contexto, sizeof(t_registros_cpu), MSG_WAITALL);
+
     return contexto;
 }
-
