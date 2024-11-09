@@ -69,6 +69,7 @@ typedef struct t_hilo
 typedef struct t_proceso
 {
     int pid;
+    int nro_hilos;
     t_contexto_proceso *contexto;
     t_list *lista_hilos;
 } t_proceso;

@@ -132,6 +132,7 @@ int crear_proceso(int pid, int tamanio)
     proceso->contexto = malloc(sizeof(t_contexto_proceso));
     proceso->contexto->limite = tamanio;
     proceso->lista_hilos = list_create();
+    proceso->nro_hilos = 0;
     if (asignar_memoria(tamanio, proceso) == -1)
     {
         log_error(logger, "NO PUDO ASIGNARSE LA MEMORIA AL PROCESO");
@@ -155,11 +156,28 @@ void destruir_proceso(t_proceso *proceso)
     list_destroy_and_destroy_elements(proceso->lista_hilos, (void *)destruir_hilo);
 }
 
+void compactar_memoria()
+{
+    t_particion *particion_elegida = NULL;
+    for (int i = 0; i < list_size(lista_particiones) - 1; i++)
+    {
+        t_particion *particion_actual = list_get(lista_particiones, i);
+        t_particion *particion_siguiente = list_get(lista_particiones, i + 1);
+        if (particion_actual->libre && particion_siguiente->libre)
+        {
+            // Esto funciona pues, al finalizar un proceso, nunca voy a tener 3 espacios de memoria libres y consecutivos.
+            particion_actual->tamanio += particion_siguiente->tamanio;
+            list_remove_and_destroy_element(lista_particiones, i + 1, (void *)free);
+        }
+    }
+}
+
 respuesta_pedido finalizar_proceso(int pid)
 {
     t_proceso *proceso = obtener_proceso(pid);
     list_remove_element(lista_procesos_en_memoria, proceso);
     destruir_proceso(proceso); // Libera la memoria utilizada por la estructura del proceso.
+    compactar_memoria();
     return OK;
 }
 
@@ -167,7 +185,7 @@ respuesta_pedido crear_hilo(int pid, char *archivo_de_pseudocodigo)
 {
     t_proceso *proceso = obtener_proceso(pid);
     t_hilo *nuevo_hilo = malloc(sizeof(t_hilo));
-    nuevo_hilo->tid = proceso->lista_hilos->elements_count;
+    nuevo_hilo->tid = proceso->nro_hilos;
     nuevo_hilo->registros = malloc(sizeof(t_registros_cpu));
     inicializar_registros(nuevo_hilo->registros);
     nuevo_hilo->lista_instrucciones = list_create();
@@ -181,6 +199,7 @@ respuesta_pedido crear_hilo(int pid, char *archivo_de_pseudocodigo)
         return ERROR;
     }
 
+    proceso->nro_hilos += 1;
     log_info(logger, "HILO CREADO EXITOSAMENTE PARA PID: %d CON TID: %d", proceso->pid, nuevo_hilo->tid);
     return OK;
 }
