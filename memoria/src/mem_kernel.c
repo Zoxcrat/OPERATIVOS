@@ -177,7 +177,10 @@ respuesta_pedido finalizar_proceso(int pid)
     t_proceso *proceso = obtener_proceso(pid);
     list_remove_element(lista_procesos_en_memoria, proceso);
     destruir_proceso(proceso); // Libera la memoria utilizada por la estructura del proceso.
-    compactar_memoria();
+    if (strcmp(ESQUEMA, "DINAMICAS"))
+    {
+        compactar_memoria();
+    }
     return OK;
 }
 
