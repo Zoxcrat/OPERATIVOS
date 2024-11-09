@@ -122,11 +122,28 @@ void *procesar_peticion(void *arg)
     return NULL;
 }
 
+void destruir_hilo(t_hilo *hilo)
+{
+    free(hilo->tid);
+    free(hilo->registros);
+    list_destroy_and_destroy_elements(hilo->lista_instrucciones, (void *)free);
+}
+
+void destruir_proceso(t_proceso *proceso)
+{
+    free(proceso->pid);
+    free(proceso->contexto);
+    list_destroy_and_destroy_elements(proceso->lista_hilos, (void *)destruir_hilo);
+}
+
 void terminar_programa()
 {
     log_destroy(logger);
     log_destroy(logger_obligatorio);
     config_destroy(config);
+    free(memoria_usuario);
+    list_destroy_and_destroy_elements(lista_procesos_en_memoria, (void *)destruir_proceso);
+    list_destroy_and_destroy_elements(lista_particiones, (void *)free);
     if (memoria_socket != -1)
         close(memoria_socket);
 }
