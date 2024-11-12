@@ -110,7 +110,7 @@ void atender_cpu()
             break;
         case ACTUALIZAR_CONTEXTO:
             tid = recibir_entero(fd_cpu);
-            t_registros_cpu *contexto = recibir_contexto(fd_cpu);
+            t_contexto_ejecucion *contexto = recibir_contexto(fd_cpu);
             respuesta = actualizar_contexto(pid, tid, contexto);
             sleep(RETARDO_RESPUESTA);
             agregar_respuesta_enviar_paquete(paquete, respuesta);

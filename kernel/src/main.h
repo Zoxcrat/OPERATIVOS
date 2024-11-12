@@ -27,8 +27,7 @@ typedef enum{
 	BLOCKED_IO,
 	BLOCKED_TJ,
 	BLOCKED_MUTEX,
-	BLOCKED_DM,
-	EXIT
+	BLOCKED_DM
 } estado;
 typedef struct {
     int PID;                        // Identificador del proceso
@@ -141,7 +140,6 @@ bool generar_conexiones();
 void procesar_conexion_cpu_dispatch();
 void procesar_conexion_cpu_interrupt();
 void inicializar_estructuras();
-void conectar_memoria();
 void iniciar_semaforos();
 void iniciar_mutex();
 void iniciar_hilos();

@@ -158,6 +158,9 @@ bool generar_conexiones(){
     pthread_t conexion_cpu_interrupt;
 	pthread_t conexion_cpu_dispatch;
 
+	fd_memoria = crear_conexion2(IP_MEMORIA, PUERTO_MEMORIA);
+    enviar_entero(0, fd_memoria);
+
 	fd_cpu_interrupt = crear_conexion2(IP_CPU, PUERTO_CPU_INTERRUPT);
 	pthread_create(&conexion_cpu_interrupt, NULL, (void*) procesar_conexion_cpu_interrupt, (void*) &fd_cpu_interrupt);
 	pthread_detach(conexion_cpu_interrupt);
@@ -413,14 +416,6 @@ void procesar_conexion_cpu_interrupt(){
         sem_wait(&mandar_interrupcion);
 
         enviar_entero(interrupcion, fd_cpu_interrupt);// Enviar la interrupción
-    }
-}
-
-void conectar_memoria(){
-    fd_memoria = crear_conexion2(IP_MEMORIA, PUERTO_MEMORIA);
-    if (fd_memoria == -1)
-    {
-        log_error(logger, "Fallo la conexión con Memoria");
     }
 }
 

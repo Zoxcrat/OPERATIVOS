@@ -298,7 +298,6 @@ void unlockear_mutex(char* nombre) {
 
 int informar_inicializacion_proceso_a_memoria(int pid, int tamanio){
     // Crear conexión efímera a la memoria
-    conectar_memoria();
 	t_paquete* paquete = crear_paquete();
 	agregar_a_paquete(paquete, &pid, sizeof(int));
 	agregar_a_paquete(paquete, &tamanio, sizeof(int));
@@ -311,7 +310,6 @@ int informar_inicializacion_proceso_a_memoria(int pid, int tamanio){
 
 int informar_finalizacion_proceso_a_memoria(int pid){
     // Crear conexión efímera a la memoria
-    conectar_memoria();
 	t_paquete* paquete = crear_paquete();
 	agregar_a_paquete(paquete, &pid, sizeof(int));
     enviar_peticion(paquete,fd_memoria,FINALIZACION_PROCESO);
@@ -322,8 +320,6 @@ int informar_finalizacion_proceso_a_memoria(int pid){
 }
 
 int informar_creacion_hilo_a_memoria(int pid, int tid, char* archivo_pseudocodigo){
-    // Crear conexión efímera a la memoria
-    conectar_memoria();
 	t_paquete* paquete = crear_paquete();
 	agregar_a_paquete(paquete, &pid, sizeof(int));
 	agregar_a_paquete(paquete, &tid, sizeof(int));
@@ -336,8 +332,6 @@ int informar_creacion_hilo_a_memoria(int pid, int tid, char* archivo_pseudocodig
 }
 
 int informar_finalizacion_hilo_a_memoria(int pid, int tid){
-    // Crear conexión efímera a la memoria
-    conectar_memoria();
 	t_paquete* paquete = crear_paquete();
 	agregar_a_paquete(paquete, &pid, sizeof(int));
 	agregar_a_paquete(paquete, &tid, sizeof(int));

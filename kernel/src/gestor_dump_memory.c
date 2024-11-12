@@ -22,7 +22,6 @@ void *gestor_dump_memory(void)
             log_warning(logger, "El hilo %d del proceso %d comienza a hacer DUMP_MEMORY",hilo->TID,hilo->PID);
             pthread_mutex_unlock(&mutex_log);
 
-            conectar_memoria();
             t_paquete* paquete = crear_paquete();
             agregar_a_paquete(paquete, &hilo->PID, sizeof(int));
             agregar_a_paquete(paquete, &hilo->TID, sizeof(int));
