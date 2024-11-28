@@ -24,8 +24,11 @@ char *ESQUEMA;
 char *ALGORITMO_BUSQUEDA;
 char **PARTICIONES; // REVISAR
 t_log_level LOG_LEVEL;
+void destruir_hilo(t_hilo *hilo);
 
 // Variables de memoria
 void *memoria_usuario;
 t_list *lista_particiones;
 t_list *lista_procesos_en_memoria;
+int proceso_buscado_cpu;
+int proceso_buscado_kernel;

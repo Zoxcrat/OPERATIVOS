@@ -122,20 +122,6 @@ void *procesar_peticion(void *arg)
     return NULL;
 }
 
-void destruir_hilo(t_hilo *hilo)
-{
-    free(hilo->tid);
-    free(hilo->registros);
-    list_destroy_and_destroy_elements(hilo->lista_instrucciones, (void *)free);
-}
-
-void destruir_proceso(t_proceso *proceso)
-{
-    free(proceso->pid);
-    free(proceso->contexto);
-    list_destroy_and_destroy_elements(proceso->lista_hilos, (void *)destruir_hilo);
-}
-
 void terminar_programa()
 {
     log_destroy(logger);

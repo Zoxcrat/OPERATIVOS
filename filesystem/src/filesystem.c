@@ -1,7 +1,9 @@
 #include "./filesystem.h"
 
-int main(int argc, char **argv) {
-    if (argc > 2) {
+int main(int argc, char **argv)
+{
+    if (argc > 2)
+    {
         return EXIT_FAILURE;
     }
 
@@ -9,7 +11,8 @@ int main(int argc, char **argv) {
     logger = log_create("filesystem.log", "filesystem", 1, LOG_LEVEL);
 
     config = config_create("src/filesystem.config");
-    if (config == NULL) {
+    if (config == NULL)
+    {
         log_error(logger, "No se encontró el archivo :");
         exit(1);
     }
@@ -18,19 +21,22 @@ int main(int argc, char **argv) {
     inicializar_filesystem();
 
     filesystem_socket = iniciar_servidor(logger, IP_ESCUCHA, PUERTO_ESCUCHA);
-    if (filesystem_socket == -1) {
+    if (filesystem_socket == -1)
+    {
         log_error(logger, "Error al iniciar el servidor del Filesystem");
         return EXIT_FAILURE;
     }
 
-    while (1) {
+    while (1)
+    {
         pthread_t hilo_cliente;
         int socket_cliente = esperar_cliente(filesystem_socket, logger);
-        if (socket_cliente == -1) {
+        if (socket_cliente == -1)
+        {
             log_info(logger, "Hubo un error en la conexion del cliente");
             continue;
         }
-        pthread_create(&hilo_cliente, NULL, procesar_conexion, (void*) (intptr_t) socket_cliente);
+        pthread_create(&hilo_cliente, NULL, procesar_conexion, (void *)(intptr_t)socket_cliente);
         pthread_detach(hilo_cliente);
     }
 
@@ -38,7 +44,8 @@ int main(int argc, char **argv) {
     return 0;
 }
 
-void leer_config() {
+void leer_config()
+{
     IP_ESCUCHA = config_get_string_value(config, "IP_ESCUCHA");
     PUERTO_ESCUCHA = config_get_string_value(config, "PUERTO_ESCUCHA");
     MOUNT_DIR = config_get_string_value(config, "MOUNT_DIR");
@@ -49,37 +56,38 @@ void leer_config() {
     LOG_LEVEL = log_level_from_string(log_level);
 }
 
-void* procesar_conexion(void* arg) {
-    int socket_cliente = (int) (intptr_t) arg;
-    op_code cop;
+void *procesar_conexion(void *arg)
+{
+    int socket_cliente = (int)(intptr_t)arg;
 
-    while (recv(socket_cliente, &cop, sizeof(op_code), 0) == sizeof(op_code)) {
-        pthread_t hilo_peticion;
-        pthread_create(&hilo_peticion, NULL, procesar_peticion, (void*) (intptr_t) socket_cliente);
-        pthread_detach(hilo_peticion);
-    }
+    pthread_t hilo_peticion;
+    pthread_create(&hilo_peticion, NULL, procesar_peticion, (void *)(intptr_t)socket_cliente);
+    pthread_detach(hilo_peticion);
 
-    log_info(logger, "El cliente se desconecto del server");
+    log_info(logger, "El Hilo se desconecto del filesystem");
     close(socket_cliente);
     return NULL;
 }
 
-void* procesar_peticion(void* arg) {
-    int socket_cliente = (int) (intptr_t) arg;
-    
-    // Simular el retardo de acceso a bloque
-    sleep(RETARDO_ACCESO_BLOQUE);
-    enviar_mensaje("OK",socket_cliente);
-    // Aca se implementa la lógica de procesamiento según el op_code
+void *procesar_peticion(void *arg)
+{
+    int socket_cliente = (int)(intptr_t)arg;
 
-    // Manejar la solicitud del cliente
+    // sacar datos de buffer
+
+    char *nombre_archivo = generar_nombre_archivo(pid, tid)
+        crear_archivo_dump(nombre_archivo, contenido, tamanio_archivo)
+
+            enviar_mensaje("OK", socket_cliente);
 
     return NULL;
 }
 
-void terminar_programa() {
+void terminar_programa()
+{
     log_destroy(logger);
     log_destroy(logger_obligatorio);
     config_destroy(config);
-    if (filesystem_socket != -1) close(filesystem_socket);
+    if (filesystem_socket != -1)
+        close(filesystem_socket);
 }

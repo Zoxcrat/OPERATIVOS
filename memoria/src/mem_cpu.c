@@ -1,30 +1,11 @@
 #include "../include/mem_cpu.h"
 
-int proceso_buscado_cpu;
-
-bool coincidePid(t_proceso *proceso)
-{
-    return (proceso->pid == proceso_buscado_cpu);
-}
-
-t_hilo *obtener_hilo(int pid, int tid)
-{
-    proceso_buscado_cpu = pid;
-    t_proceso *proceso = list_find(lista_procesos_en_memoria, (void *)coincidePid);
-    t_hilo *hilo = list_get(proceso->lista_hilos, tid);
-
-    if (!hilo)
-    {
-        log_error(logger, "NO SE ENCONTRO EL HILO BUSCADO.");
-        exit(EXIT_FAILURE);
-    }
-    return hilo;
-}
-
 t_contexto_ejecucion *obtener_contexto(int pid, int tid)
 {
 
     t_hilo *hilo = obtener_hilo(pid, tid);
+    proceso_buscado_cpu = pid;
+    t_proceso *proceso = list_find(lista_procesos_en_memoria, (void *)coincidePidCpu);
 
     t_contexto_ejecucion *contexto_completo = malloc(sizeof(t_contexto_ejecucion));
     contexto_completo->base = proceso->contexto->base;
@@ -45,15 +26,9 @@ t_contexto_ejecucion *obtener_contexto(int pid, int tid)
 respuesta_pedido actualizar_contexto(int pid, int tid, t_registros_cpu *nuevo_contexto)
 {
     t_hilo *hilo = obtener_hilo(pid, tid);
-    t_registros_cpu registros_hilo = hilo->registros;
+    t_registros_cpu *registros_hilo = hilo->registros;
     registros_hilo = nuevo_contexto;
     return OK;
-}
-
-void agregar_respuesta_enviar_paquete(t_paquete *paquete, respuesta_pedido respuesta)
-{
-    agregar_a_paquete(paquete, (void *)respuesta, sizeof(respuesta_pedido));
-    enviar_paquete(paquete, fd_kernel);
 }
 
 char *obtener_instruccion(int pid, int tid)
@@ -96,21 +71,24 @@ void atender_cpu()
         recibir_entero(fd_cpu);
         int pid = recibir_entero(fd_cpu);
         int tid;
+        int base;
+        void *contenido;
         t_paquete *paquete;
         respuesta_pedido respuesta;
+        t_contexto_ejecucion *contexto;
         switch (cod_op)
         {
         case PEDIDO_CONTEXTO:
             tid = recibir_entero(fd_cpu);
-            t_contexto_ejecucion *contexto = obtener_contexto(pid, tid);
+            contexto = obtener_contexto(pid, tid);
             agregar_a_paquete(paquete, PEDIDO_CONTEXTO, sizeof(op_code));
             agregar_a_paquete(paquete, (void *)contexto, sizeof(t_contexto_ejecucion));
             sleep(RETARDO_RESPUESTA);
-            enviar_paquete(fd_cpu);
+            enviar_paquete(paquete, fd_cpu);
             break;
         case ACTUALIZAR_CONTEXTO:
             tid = recibir_entero(fd_cpu);
-            t_contexto_ejecucion *contexto = recibir_contexto(fd_cpu);
+            contexto = recibir_contexto(fd_cpu);
             respuesta = actualizar_contexto(pid, tid, contexto);
             sleep(RETARDO_RESPUESTA);
             agregar_respuesta_enviar_paquete(paquete, respuesta);
@@ -120,7 +98,7 @@ void atender_cpu()
             char *instruccion = obtener_instruccion(pid, tid);
             agregar_a_paquete(paquete, (void *)instruccion, strlen(instruccion));
             sleep(RETARDO_RESPUESTA);
-            enviar_paquete(fd_cpu);
+            enviar_paquete(paquete, fd_cpu);
             break;
         case ESCRIBIR_MEMORIA:
             int base = recibir_entero(fd_cpu);
@@ -130,8 +108,8 @@ void atender_cpu()
             agregar_respuesta_enviar_paquete(paquete, respuesta);
             break;
         case LEER_MEMORIA:
-            int base = recibir_entero(fd_cpu);
-            void *contenido = read_mem(base);
+            base = recibir_entero(fd_cpu);
+            contenido = read_mem(base);
             agregar_a_paquete(paquete, contenido, sizeof(char) * 4);
             sleep(RETARDO_RESPUESTA);
             enviar_paquete(paquete, fd_cpu);

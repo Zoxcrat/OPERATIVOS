@@ -48,16 +48,13 @@ extern t_log_level LOG_LEVEL;
 extern void *memoria_usuario;
 extern t_list *lista_particiones;
 extern t_list *lista_procesos_en_memoria;
+extern int proceso_buscado_cpu;
+extern int proceso_buscado_kernel;
 typedef struct t_contexto_proceso
 {
     void *base;
     int limite;
 } t_contexto_proceso;
-
-typedef struct t_registros_cpu
-{
-    uint32_t PC, AX, BX, CX, DX, EX, FX, GX, HX;
-} t_registros_cpu;
 
 typedef struct t_hilo
 {
@@ -84,6 +81,7 @@ enum ID_CLIENTE
 #include "mem_init.h"
 #include "mem_kernel.h"
 #include "mem_cpu.h"
+#include "mem_cleanup.h"
 
 // INIT
 void leer_config();
@@ -92,6 +90,7 @@ void *procesar_peticion(void *arg);
 void terminar_programa();
 void atender_cpu();
 void atender_kernel();
+void destruir_hilo(t_hilo *hilo);
 
 typedef struct t_particion
 {

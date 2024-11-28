@@ -11,6 +11,4 @@ respuesta_pedido finalizar_hilo(int pid, int tid);
 respuesta_pedido asignar_memoria(int tamanio, t_proceso *proceso);
 void inicializar_registros(t_registros_cpu *registros);
 
-extern int proceso_buscado;
-
 #endif
