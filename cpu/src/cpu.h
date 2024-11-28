@@ -57,7 +57,7 @@ void cpu_cycle();
 char* fetch();
 void decode(char* mensaje);
 void execute();
-int traducir_direccion_logica_a_fisica(int direccion_logica);
+int traducir_direccion_logica_a_fisica(char* registro_direccion);
 void set_valor_registro(char* registro, uint32_t valor);
 void sumar_registros(char* destino, char* origen);
 op_code string_a_instruccion(char *str);

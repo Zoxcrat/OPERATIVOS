@@ -26,7 +26,6 @@ int main(int argc, char **argv) {
 		exit(1);
 	}
 
-
     sleep(150);
 
 	terminar_programa();
@@ -58,14 +57,14 @@ bool generar_conexiones(){
     pthread_create(&hilo_interrupt, NULL, manejar_cliente_interrupt, &interrupt_socket);
     pthread_detach(hilo_interrupt);
 
-    return dispatch_socket != -1 && interrupt_socket != -1;
+    return fd_memoria != -1 && dispatch_socket != -1 && interrupt_socket != -1;
 }
 
 // Funciones para manejar conexiones
 void* manejar_cliente_dispatch() {
     int cliente_socket_dispatch = esperar_cliente(dispatch_socket, logger);
     
-    char *respuesta = "hola kernel, soy cpu";
+    char *respuesta = "hola kernel, soy cpu dispatch";
     enviar_mensaje(respuesta, cliente_socket_dispatch);
     
     if (cliente_socket_dispatch == -1) {
@@ -146,9 +145,10 @@ char* fetch() {
     enviar_peticion(paquete,fd_memoria,PROXIMA_INSTRUCCION);
     eliminar_paquete(paquete);
 
+    recibir_operacion(fd_memoria);
     char* instruccion = recibir_mensaje2(dispatch_socket,logger);
 
-    log_info(logger, "Instrucción recibida: %d", instruccion_actual->instruccion);
+    log_info(logger, "Instrucción recibida: %d", instruccion);
     
     return instruccion;
 }
@@ -187,12 +187,12 @@ void decode(char* mensaje)
 void execute() {
     switch (instruccion_actual->instruccion) {
         t_paquete *paquete;
-        case SET:
+        case SET:{
             uint32_t valor = (uint32_t) strtoul(instruccion_actual->parametro2, NULL, 5);
             set_valor_registro(instruccion_actual->parametro1, valor);
-            break;
+            break;}
         case READ_MEM:{
-            int direccion_fis = traducir_direccion_logica_a_fisica(atoi(instruccion_actual->parametro2)); // DECODE
+            int direccion_fis = traducir_direccion_logica_a_fisica(instruccion_actual->parametro2); // DECODE
             log_info(logger, "READ MEM");
             if (direccion_fis != -1) { // Verificar si no hubo segmentation fault
                 // Leer el valor desde la memoria física
@@ -216,7 +216,7 @@ void execute() {
             }
             break;}
         case WRITE_MEM:{
-            int direccion_fis = traducir_direccion_logica_a_fisica(atoi(instruccion_actual->parametro1)); // DECODE
+            int direccion_fis = traducir_direccion_logica_a_fisica(instruccion_actual->parametro1); // DECODE
             
             if (direccion_fis != -1) { // Verificar si no hubo segmentation fault
                 // EScribir el valor desde la memoria física
@@ -234,19 +234,19 @@ void execute() {
                 log_error(logger, "READ MEM: Segmentation Fault al intentar acceder a la dirección lógica %d", direccion_fis);
             }
             break;}
-        case SUM:
+        case SUM:{
             sumar_registros(instruccion_actual->parametro1, instruccion_actual->parametro2);
-            break;
-        case SUB:
+            break;}
+        case SUB:{
             restar_registros(instruccion_actual->parametro1, instruccion_actual->parametro2);
-            break;
-        case JNZ:
+            break;}
+        case JNZ:{
             jnz_registro(instruccion_actual->parametro1, atoi(instruccion_actual->parametro2));
-            break;
-        case LOG:
+            break;}
+        case LOG:{
             log_registro(instruccion_actual->parametro1);
-            break;
-        case PROCESS_CREATE:
+            break;}
+        case PROCESS_CREATE:{
             log_info(logger, "operacion PROCESS_CREATE - Notificando al Kernel");
                 // Crear un paquete
             paquete= crear_paquete();
@@ -255,8 +255,8 @@ void execute() {
             agregar_a_paquete(paquete, instruccion_actual->parametro3, strlen(instruccion_actual->parametro3) + 1);
             enviar_peticion(paquete,dispatch_socket,PROCESS_CREATE);
             eliminar_paquete(paquete);
-            break;
-        case PROCESS_EXIT:
+            break;}
+        case PROCESS_EXIT:{
             log_info(logger, "operacion PROCESS_EXIT - Notificando al Kernel");
             paquete= crear_paquete();
             agregar_a_paquete(paquete, instruccion_actual->parametro1, strlen(instruccion_actual->parametro1) + 1); // +1 for null terminator
@@ -264,8 +264,8 @@ void execute() {
             agregar_a_paquete(paquete, instruccion_actual->parametro3, strlen(instruccion_actual->parametro3) + 1);
             enviar_peticion(paquete,dispatch_socket,PROCESS_EXIT);
             eliminar_paquete(paquete);
-            break;
-        case THREAD_CREATE:
+            break;}
+        case THREAD_CREATE:{
             log_info(logger, "operacion THREAD_CREATE - Notificando al Kernel");
             paquete= crear_paquete();
             agregar_a_paquete(paquete, instruccion_actual->parametro1, strlen(instruccion_actual->parametro1) + 1); // +1 for null terminator
@@ -273,8 +273,8 @@ void execute() {
             agregar_a_paquete(paquete, instruccion_actual->parametro3, strlen(instruccion_actual->parametro3) + 1);
             enviar_peticion(paquete,dispatch_socket,THREAD_CREATE);
             eliminar_paquete(paquete);
-            break;
-        case THREAD_JOIN:
+            break;}
+        case THREAD_JOIN:{
             log_info(logger, "operacion THREAD_JOIN - Notificando al Kernel");
             paquete= crear_paquete();
             agregar_a_paquete(paquete, instruccion_actual->parametro1, strlen(instruccion_actual->parametro1) + 1); // +1 for null terminator
@@ -282,8 +282,8 @@ void execute() {
             agregar_a_paquete(paquete, instruccion_actual->parametro3, strlen(instruccion_actual->parametro3) + 1);
             enviar_peticion(paquete,dispatch_socket,THREAD_JOIN);
             eliminar_paquete(paquete);
-            break;
-        case THREAD_CANCEL:
+            break;}
+        case THREAD_CANCEL:{
             log_info(logger, "operacion THREAD_CANCEL - Notificando al Kernel");
             paquete= crear_paquete();
             agregar_a_paquete(paquete, instruccion_actual->parametro1, strlen(instruccion_actual->parametro1) + 1); // +1 for null terminator
@@ -291,8 +291,8 @@ void execute() {
             agregar_a_paquete(paquete, instruccion_actual->parametro3, strlen(instruccion_actual->parametro3) + 1);
             enviar_peticion(paquete,dispatch_socket,THREAD_CANCEL);
             eliminar_paquete(paquete);
-            break;
-        case THREAD_EXIT:
+            break;}
+        case THREAD_EXIT:{
             log_info(logger, "operacion THREAD_EXIT - Notificando al Kernel");
             paquete= crear_paquete();
             agregar_a_paquete(paquete, instruccion_actual->parametro1, strlen(instruccion_actual->parametro1) + 1); // +1 for null terminator
@@ -300,8 +300,8 @@ void execute() {
             agregar_a_paquete(paquete, instruccion_actual->parametro3, strlen(instruccion_actual->parametro3) + 1);
             enviar_peticion(paquete,dispatch_socket,THREAD_EXIT);
             eliminar_paquete(paquete);
-            break;
-        case MUTEX_CREATE:
+            break;}
+        case MUTEX_CREATE:{
             log_info(logger, "operacion MUTEX_CREATE - Notificando al Kernel");
             paquete= crear_paquete();
             agregar_a_paquete(paquete, instruccion_actual->parametro1, strlen(instruccion_actual->parametro1) + 1); // +1 for null terminator
@@ -309,8 +309,8 @@ void execute() {
             agregar_a_paquete(paquete, instruccion_actual->parametro3, strlen(instruccion_actual->parametro3) + 1);
             enviar_peticion(paquete,dispatch_socket,MUTEX_CREATE);
             eliminar_paquete(paquete);
-            break;
-        case MUTEX_LOCK:
+            break;}
+        case MUTEX_LOCK:{
             log_info(logger, "operacion MUTEX_LOCK - Notificando al Kernel");
             paquete= crear_paquete();
             agregar_a_paquete(paquete, instruccion_actual->parametro1, strlen(instruccion_actual->parametro1) + 1); // +1 for null terminator
@@ -318,8 +318,8 @@ void execute() {
             agregar_a_paquete(paquete, instruccion_actual->parametro3, strlen(instruccion_actual->parametro3) + 1);
             enviar_peticion(paquete,dispatch_socket,MUTEX_LOCK);
             eliminar_paquete(paquete);
-            break;
-        case MUTEX_UNLOCK:
+            break;}
+        case MUTEX_UNLOCK:{
             log_info(logger, "operacion MUTEX_UNLOCK - Notificando al Kernel");
             paquete= crear_paquete();
             agregar_a_paquete(paquete, instruccion_actual->parametro1, strlen(instruccion_actual->parametro1) + 1); // +1 for null terminator
@@ -327,8 +327,8 @@ void execute() {
             agregar_a_paquete(paquete, instruccion_actual->parametro3, strlen(instruccion_actual->parametro3) + 1);
             enviar_peticion(paquete,dispatch_socket,MUTEX_UNLOCK);
             eliminar_paquete(paquete);
-            break;
-        case DUMP_MEMORY:
+            break;}
+        case DUMP_MEMORY:{
             log_info(logger, "operacion DUMP_MEMORY - Notificando al Kernel");
             paquete= crear_paquete();
             agregar_a_paquete(paquete, instruccion_actual->parametro1, strlen(instruccion_actual->parametro1) + 1); // +1 for null terminator
@@ -336,8 +336,8 @@ void execute() {
             agregar_a_paquete(paquete, instruccion_actual->parametro3, strlen(instruccion_actual->parametro3) + 1);
             enviar_peticion(paquete,dispatch_socket,DUMP_MEMORY);
             eliminar_paquete(paquete);
-            break;
-        case IO:
+            break;}
+        case IO:{
             log_info(logger, "operacion IO - Notificando al Kernel");
             paquete= crear_paquete();
             agregar_a_paquete(paquete, instruccion_actual->parametro1, strlen(instruccion_actual->parametro1) + 1); // +1 for null terminator
@@ -345,7 +345,7 @@ void execute() {
             agregar_a_paquete(paquete, instruccion_actual->parametro3, strlen(instruccion_actual->parametro3) + 1);
             enviar_peticion(paquete,dispatch_socket,IO);
             eliminar_paquete(paquete);
-            break;
+            break;}
         default:
             log_warning(logger, "Instrucción no reconocida");
             break;
@@ -374,12 +374,39 @@ op_code string_a_instruccion(char *str) {
     return SEGMENTATION_FAULT;  // Valor por defecto en caso de error
 }
 
-int traducir_direccion_logica_a_fisica(int direccion_logica){
+int traducir_direccion_logica_a_fisica(char* registro_direccion){
+    uint32_t valor_registro_direccion;
+
+    if (strcmp(registro_direccion, "PC") == 0) {
+        valor_registro_direccion = contexto->PC;
+    } else if (strcmp(registro_direccion, "AX") == 0) {
+        valor_registro_direccion = contexto->AX;
+    } else if (strcmp(registro_direccion, "BX") == 0) {
+        valor_registro_direccion = contexto->BX;
+    } else if (strcmp(registro_direccion, "CX") == 0) {
+        valor_registro_direccion = contexto->CX;
+    } else if (strcmp(registro_direccion, "DX") == 0) {
+        valor_registro_direccion = contexto->DX;
+    } else if (strcmp(registro_direccion, "EX") == 0) {
+        valor_registro_direccion = contexto->EX;
+    } else if (strcmp(registro_direccion, "FX") == 0) {
+        valor_registro_direccion = contexto->FX;
+    } else if (strcmp(registro_direccion, "GX") == 0) {
+        valor_registro_direccion = contexto->GX;
+    } else if (strcmp(registro_direccion, "HX") == 0) {
+        valor_registro_direccion = contexto->HX;
+    }
+      else {
+        log_info(logger, "desplazamiento/direccion logica %s no reconocido", valor_registro_direccion);
+        return;
+    }
+
     int direccion_fisica;
-    if (direccion_logica < 0 || direccion_logica >= contexto->limite){
+    direccion_fisica = contexto->base + valor_registro_direccion;
+
+    if (direccion_fisica < 0 || direccion_fisica > contexto->limite){
         return -1;
-        }
-    direccion_fisica = contexto->base + direccion_logica;
+    }
     return direccion_fisica;
 }
 
@@ -635,7 +662,7 @@ void log_registro(char* registro) {
     }
 
     // Escribir el valor del registro en el archivo de log
-    log_info(logger, "El valor del registro %s es %u", registro, valor_registro);
+    log_info(logger_obligatorio, "El valor del registro %s es %u", registro, valor_registro);
 }
 
 uint32_t leer_memoria(int direccion_fisica){

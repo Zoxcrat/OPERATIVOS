@@ -165,7 +165,7 @@ bool generar_conexiones(){
 	pthread_create(&conexion_cpu_dispatch, NULL, (void*) procesar_conexion_cpu_dispatch, (void*) &fd_cpu_dispatch);
 	pthread_detach(conexion_cpu_dispatch);
 
-	return fd_cpu_interrupt != -1 && fd_cpu_dispatch != -1;
+	return fd_memoria != -1 && fd_cpu_interrupt != -1 && fd_cpu_dispatch != -1;
 }
 
 void procesar_conexion_cpu_dispatch() {
