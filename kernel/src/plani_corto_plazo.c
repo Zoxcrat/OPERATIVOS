@@ -49,6 +49,7 @@ void* algoritmo_prioridades(void* args) {
 
         if(!list_is_empty(cola_ready) && hilo_en_exec == NULL){
         pthread_mutex_lock(&mutex_cola_ready);
+
         TCB* hilo_con_prioridad = list_get(cola_ready, 0);
         int index_con_prioridad = 0;
         for (int i = 1; i < list_size(cola_ready); i++) {
@@ -59,6 +60,7 @@ void* algoritmo_prioridades(void* args) {
             }
         }
         hilo_con_prioridad = list_remove(cola_ready, index_con_prioridad);
+        
         pthread_mutex_unlock(&mutex_cola_ready);
 
         pthread_mutex_lock(&mutex_socket_dispatch);

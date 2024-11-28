@@ -26,7 +26,8 @@ int main(int argc, char **argv) {
 		exit(1);
 	}
 
-    sleep(15);
+
+    sleep(150);
 
 	terminar_programa();
 	return 0;
@@ -45,6 +46,7 @@ void leer_config()
 
 bool generar_conexiones(){
 	fd_memoria = crear_conexion2(IP_MEMORIA, PUERTO_MEMORIA);
+    enviar_entero(1, fd_memoria);
 	pthread_create(&conexion_memoria, NULL, (void*) pedir_contexto_a_memoria, (void*) &fd_memoria);
 	pthread_detach(conexion_memoria);
 
@@ -56,14 +58,14 @@ bool generar_conexiones(){
     pthread_create(&hilo_interrupt, NULL, manejar_cliente_interrupt, &interrupt_socket);
     pthread_detach(hilo_interrupt);
 
-    return fd_memoria != -1 && dispatch_socket != -1 && interrupt_socket != -1;
+    return dispatch_socket != -1 && interrupt_socket != -1;
 }
 
 // Funciones para manejar conexiones
 void* manejar_cliente_dispatch() {
     int cliente_socket_dispatch = esperar_cliente(dispatch_socket, logger);
     
-    char *respuesta = "Mensaje a enviar";
+    char *respuesta = "hola kernel, soy cpu";
     enviar_mensaje(respuesta, cliente_socket_dispatch);
     
     if (cliente_socket_dispatch == -1) {

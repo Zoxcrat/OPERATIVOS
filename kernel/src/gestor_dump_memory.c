@@ -43,8 +43,6 @@ void *gestor_dump_memory(void)
             }else{
                 finalizar_proceso(hilo->PID);
             }
-
-            close(fd_memoria);
         }
     }
 }

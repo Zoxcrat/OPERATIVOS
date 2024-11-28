@@ -76,10 +76,6 @@ int main(int argc, char **argv)
         return EXIT_FAILURE;
     }
 
-    // Inicializar proceso con argumentos
-    char* archivo_pseudocodigo = argv[1];
-    int tamanio_proceso = atoi(argv[2]);
-
     // Crear loggers con el nivel de log desde la configuración
     logger = log_create("kernel.log", "kernel", 1, LOG_LEVEL);
     logger_obligatorio = log_create("kernel_obligatorio.log", "kernel_obligatorio", 1, LOG_LEVEL);
@@ -106,14 +102,14 @@ int main(int argc, char **argv)
     enviar_mensaje("Hola CPU interrupt, Soy Kernel!", fd_cpu_interrupt);
     enviar_mensaje("Hola CPU dispatcher, Soy Kernel!", fd_cpu_dispatch);
 
-    //inicializar_plani_largo_plazo();
-    //inicializar_plani_corto_plazo();
-    //inicializar_gestor_io();
-    //inicializar_gestor_dump_memory();
+    inicializar_plani_largo_plazo();
+    inicializar_plani_corto_plazo();
+    inicializar_gestor_io();
+    inicializar_gestor_dump_memory();
 
-    crear_proceso(archivo_pseudocodigo, tamanio_proceso, 0);
+    // crear_proceso(archivo_pseudocodigo, tamanio_proceso, 0);
 
-    sleep(15);
+    sleep(150);
 
     terminar_programa();
     return 0;
@@ -174,6 +170,9 @@ bool generar_conexiones(){
 
 void procesar_conexion_cpu_dispatch() {
     while (1) {
+        recibir_operacion(fd_cpu_dispatch);
+        recibir_mensaje(fd_cpu_dispatch, logger);
+
         t_instruccion_completa* syscall = malloc(sizeof(t_instruccion_completa));
 
         t_list* paquete = recibir_paquete(fd_cpu_dispatch);
@@ -334,10 +333,6 @@ void procesar_conexion_cpu_dispatch() {
             case DUMP_MEMORY: {
                 pthread_mutex_lock(&mutex_log);
                 log_info(logger_obligatorio, "## (%d:%d) - Solicitó syscall: DUMP_MEMORY", hilo_en_exec->PID,hilo_en_exec->TID);
-                pthread_mutex_unlock(&mutex_log);
-
-                pthread_mutex_lock(&mutex_log);
-                log_info(logger_obligatorio, "## (%d:%d) - Bloqueado por: DUMP_MEMORY", hilo_en_exec->PID,hilo_en_exec->TID);
                 pthread_mutex_unlock(&mutex_log);
 
                 hilo_desalojado = true;

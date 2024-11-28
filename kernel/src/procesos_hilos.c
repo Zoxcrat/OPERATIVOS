@@ -205,7 +205,8 @@ void crear_mutex(char* nombre) {
 
     t_mutex* nuevo_mutex = malloc(sizeof(t_mutex));
     nuevo_mutex->nombre = nombre;  
-    nuevo_mutex->cola_bloqueados = list_create();    
+    nuevo_mutex->cola_bloqueados = list_create();   
+    nuevo_mutex->TID = -1; 
 
     list_add(proceso->mutexs, nuevo_mutex);// Asociar el mutex al proceso
 
@@ -304,7 +305,6 @@ int informar_inicializacion_proceso_a_memoria(int pid, int tamanio){
     enviar_peticion(paquete,fd_memoria,INICIALIZAR_PROCESO);
 	eliminar_paquete(paquete);
     int respuesta = recibir_entero(fd_memoria);
-    close(fd_memoria);  // Cerrar la conexión con memoria
     return respuesta;
 }
 
@@ -315,7 +315,6 @@ int informar_finalizacion_proceso_a_memoria(int pid){
     enviar_peticion(paquete,fd_memoria,FINALIZACION_PROCESO);
 	eliminar_paquete(paquete);
     int respuesta = recibir_entero(fd_memoria);
-    close(fd_memoria);  // Cerrar la conexión con memoria
     return respuesta;
 }
 
@@ -327,7 +326,6 @@ int informar_creacion_hilo_a_memoria(int pid, int tid, char* archivo_pseudocodig
     enviar_peticion(paquete,fd_memoria,CREACION_HILO);
 	eliminar_paquete(paquete);
     int respuesta = recibir_entero(fd_memoria);
-    close(fd_memoria);  // Cerrar la conexión con memoria
     return respuesta;
 }
 
@@ -338,7 +336,6 @@ int informar_finalizacion_hilo_a_memoria(int pid, int tid){
     enviar_peticion(paquete,fd_memoria,FINALIZACION_HILO);
 	eliminar_paquete(paquete);
     int respuesta = recibir_entero(fd_memoria);
-    close(fd_memoria);  // Cerrar la conexión con memoria
     return respuesta;
 }
 
