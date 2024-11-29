@@ -5,6 +5,7 @@
 #include <stdio.h>
 #include <../../utils/src/utils/conexiones_cliente.h>
 #include <../../utils/src/utils/conexiones_servidor.h>
+#include <../../utils/src/utils/protocolo.h>
 #include <commons/config.h>
 #include <commons/log.h>
 #include <commons/error.h>
@@ -61,6 +62,13 @@ void init_bitarray()
 
 void inicializar_filesystem()
 {
+    // Asignar memoria para bitmap_buffer
+    bitmap_buffer = malloc(BITMAP_SIZE);
+    if (bitmap_buffer == NULL) {
+        log_error(logger, "No se pudo asignar memoria para el bitmap_buffer");
+        exit(1);
+    }
+
     // Abrir o crear el archivo bitmap.dat
     char bitmap_path[256];
     snprintf(bitmap_path, sizeof(bitmap_path), "%s/bitmap.dat", MOUNT_DIR);
@@ -73,6 +81,7 @@ void inicializar_filesystem()
         if (bitmap_file == NULL)
         {
             log_error(logger, "No se pudo crear bitmap.dat");
+            free(bitmap_buffer);
             exit(1);
         }
         // Inicializar el bitmap con 0s
@@ -99,6 +108,7 @@ void inicializar_filesystem()
         if (blocks_file == NULL)
         {
             log_error(logger, "No se pudo crear bloques.dat");
+             free(bitmap_buffer);
             exit(1);
         }
     }
@@ -107,6 +117,7 @@ void inicializar_filesystem()
 void destroy_bitarray()
 {
     bitarray_destroy(bitarray);
+    free(bitmap_buffer);
 }
 
 int buscar_bloque_libre()
@@ -193,17 +204,17 @@ char *generar_nombre_archivo(int pid, int tid)
     }
 
     // Generar el timestamp actual
-    char *temporal = temporal_get_string_time();
+    char *temporal = temporal_get_string_time("%Y%m%d%H%M%S");
     snprintf(timestamp, sizeof(timestamp), "%s", temporal);
-    free(temporal); // Libera el string creado por `temporal_get_string_time`
+    free(temporal);
 
     // Formatear el nombre del archivo
     snprintf(nombre_archivo, 128, "%d-%d-%s.dmp", pid, tid, timestamp);
 
-    return nombre_archivo; // El usuario de la función debe liberar esta memoria
+    return nombre_archivo; 
 }
 
-int crear_archivo_dump(const char *nombre_archivo, const void *contenido, size_t tamanio_archivo)
+respuesta_pedido crear_archivo_dump(const char *nombre_archivo, const void *contenido, size_t tamanio_archivo)
 {
     int bloques_necesarios = (tamanio_archivo + BLOCK_SIZE - 1) / BLOCK_SIZE; // Calcula bloques necesarios (redondeo hacia arriba)
 
@@ -212,7 +223,7 @@ int crear_archivo_dump(const char *nombre_archivo, const void *contenido, size_t
     { // Incluye el bloque de índice
         pthread_mutex_unlock(&fs_lock);
         log_error(logger, "No hay bloques suficientes para crear el archivo: %s", nombre_archivo);
-        return -1; // Responder con error
+        return ERROR; 
     }
 
     // Reservar bloque de índice
@@ -221,7 +232,7 @@ int crear_archivo_dump(const char *nombre_archivo, const void *contenido, size_t
     {
         pthread_mutex_unlock(&fs_lock);
         log_error(logger, "Error al asignar bloque de índice para el archivo: %s", nombre_archivo);
-        return -1; // Responder con error
+        return ERROR; 
     }
 
     log_info(logger, "## Bloque asignado: %d - Archivo: %s - Bloques Libres: %d",
@@ -241,7 +252,7 @@ int crear_archivo_dump(const char *nombre_archivo, const void *contenido, size_t
                 liberar_bloque(bloques_datos[j]);
             }
             pthread_mutex_unlock(&fs_lock);
-            return -1; // Responder con error
+            return ERROR; 
         }
         log_info(logger, "## Bloque asignado: %d - Archivo: %s - Bloques Libres: %d",
                  bloques_datos[i], nombre_archivo, calcular_bloques_libres());
@@ -267,6 +278,9 @@ int crear_archivo_dump(const char *nombre_archivo, const void *contenido, size_t
         usleep(RETARDO_ACCESO_BLOQUE * 1000); // RETARDO_ACCESO_BLOQUE en milisegundos
     }
 
+    fclose(blocks_file);
+    blocks_file = NULL;
+
     pthread_mutex_unlock(&fs_lock);
 
     // Crear el archivo de metadata
@@ -275,7 +289,11 @@ int crear_archivo_dump(const char *nombre_archivo, const void *contenido, size_t
     log_info(logger, "## Archivo Creado: %s - Tamaño: %zu", nombre_archivo, tamanio_archivo);
     log_info(logger, "## Fin de solicitud - Archivo: %s", nombre_archivo);
 
-    return 0; // Responder con éxito
+    return OK;
+}
+void enviar_respuesta(respuesta_pedido mensaje, int socket_cliente)
+{
+    send(socket_cliente, &mensaje, sizeof(int), 0); // Envía el mensaje como un entero
 }
 
 #endif
