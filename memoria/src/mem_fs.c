@@ -13,4 +13,5 @@ void generarMemoryDump(int pid, int tid)
     agregar_a_paquete(paquete, memoria_hilo, contexto_completo->limite);
     enviar_paquete(paquete, fd_filesystem);
     free(contexto_completo);
+    free(memoria_hilo);
 }
