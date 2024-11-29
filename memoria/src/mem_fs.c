@@ -13,7 +13,7 @@ respuesta_pedido generarMemoryDump(int pid, int tid)
     agregar_a_paquete(paquete, memoria_hilo, contexto_completo->limite);
     enviar_paquete(paquete, fd_filesystem);
     respuesta_pedido respuesta;
-    recv(fd_filesystem, respuesta, sizeof(respuesta_pedido));
+    recv(fd_filesystem, (void *)respuesta, sizeof(respuesta_pedido), 0);
     free(contexto_completo);
     free(memoria_hilo);
     return respuesta;

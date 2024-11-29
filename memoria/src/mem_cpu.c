@@ -81,38 +81,48 @@ void atender_cpu()
         case PEDIDO_CONTEXTO:
             tid = recibir_entero(fd_cpu);
             contexto = obtener_contexto(pid, tid);
+            paquete = crear_paquete();
             agregar_a_paquete(paquete, PEDIDO_CONTEXTO, sizeof(op_code));
             agregar_a_paquete(paquete, (void *)contexto, sizeof(t_contexto_ejecucion));
             sleep(RETARDO_RESPUESTA);
             enviar_paquete(paquete, fd_cpu);
+            free(paquete);
             break;
         case ACTUALIZAR_CONTEXTO:
             tid = recibir_entero(fd_cpu);
             contexto = recibir_contexto(fd_cpu);
             respuesta = actualizar_contexto(pid, tid, contexto);
+            paquete = crear_paquete();
             sleep(RETARDO_RESPUESTA);
             agregar_respuesta_enviar_paquete(paquete, respuesta);
+            free(paquete);
             break;
         case OBTENER_INSTRUCCION:
             tid = recibir_entero(fd_cpu);
             char *instruccion = obtener_instruccion(pid, tid);
+            paquete = crear_paquete();
             agregar_a_paquete(paquete, (void *)instruccion, strlen(instruccion));
             sleep(RETARDO_RESPUESTA);
             enviar_paquete(paquete, fd_cpu);
+            free(paquete);
             break;
         case ESCRIBIR_MEMORIA:
             int base = recibir_entero(fd_cpu);
             void *contenido = recibir_buffer(fd_cpu, sizeof(char) * 4);
             respuesta = write_mem(base, contenido);
+            paquete = crear_paquete();
             sleep(RETARDO_RESPUESTA);
             agregar_respuesta_enviar_paquete(paquete, respuesta);
+            free(paquete);
             break;
         case LEER_MEMORIA:
             base = recibir_entero(fd_cpu);
             contenido = read_mem(base);
+            paquete = crear_paquete();
             agregar_a_paquete(paquete, contenido, sizeof(char) * 4);
             sleep(RETARDO_RESPUESTA);
             enviar_paquete(paquete, fd_cpu);
+            free(paquete);
             break;
         default:
             log_error(logger, "La CPU no entendio la operacion.");

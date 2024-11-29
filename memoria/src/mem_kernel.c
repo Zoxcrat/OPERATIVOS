@@ -207,12 +207,16 @@ void atender_kernel()
             tamanio = recibir_entero(fd_kernel);
             respuesta = crear_proceso(pid, tamanio);
             sleep(RETARDO_RESPUESTA);
+            paquete = crear_paquete();
             agregar_respuesta_enviar_paquete(paquete, respuesta);
+            free(paquete);
             break;
         case FINALIZACION_PROCESO:
             respuesta = finalizar_proceso(pid);
             sleep(RETARDO_RESPUESTA);
+            paquete = crear_paquete();
             agregar_respuesta_enviar_paquete(paquete, respuesta);
+            free(paquete);
             break;
         case CREACION_HILO:
             tid = recibir_entero(fd_kernel);
@@ -221,19 +225,25 @@ void atender_kernel()
             recibir_buffer(nombre_archivo, tamanio);
             respuesta = crear_hilo(pid, nombre_archivo);
             sleep(RETARDO_RESPUESTA);
+            paquete = crear_paquete();
             agregar_respuesta_enviar_paquete(paquete, respuesta);
+            free(paquete);
             break;
         case FINALIZACION_HILO:
             tid = recibir_entero(fd_kernel);
             respuesta = finalizar_hilo(pid, tid);
             sleep(RETARDO_RESPUESTA);
+            paquete = crear_paquete();
             agregar_respuesta_enviar_paquete(paquete, respuesta);
+            free(paquete);
             break;
         case MEMORY_DUMP:
             tid = recibir_entero(fd_kernel);
             sleep(RETARDO_RESPUESTA);
             respuesta = generarMemoryDump(pid, tid);
+            paquete = crear_paquete();
             agregar_respuesta_enviar_paquete(paquete, respuesta);
+            free(paquete);
             break;
         case EXIT:
             control_key = 0;
