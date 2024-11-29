@@ -50,6 +50,7 @@ extern t_list *lista_particiones;
 extern t_list *lista_procesos_en_memoria;
 extern int proceso_buscado_cpu;
 extern int proceso_buscado_kernel;
+extern int proceso_buscado_fs;
 typedef struct t_contexto_proceso
 {
     void *base;
@@ -82,6 +83,7 @@ enum ID_CLIENTE
 #include "mem_kernel.h"
 #include "mem_cpu.h"
 #include "mem_cleanup.h"
+#include "mem_fs.h"
 
 // INIT
 void leer_config();

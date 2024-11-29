@@ -203,16 +203,16 @@ char *generar_nombre_archivo(int pid, int tid)
     return nombre_archivo; // El usuario de la función debe liberar esta memoria
 }
 
-void crear_archivo_dump(const char *nombre_archivo, const void *contenido, size_t tamanio_archivo)
+int crear_archivo_dump(const char *nombre_archivo, const void *contenido, size_t tamanio_archivo)
 {
     int bloques_necesarios = (tamanio_archivo + BLOCK_SIZE - 1) / BLOCK_SIZE; // Calcula bloques necesarios (redondeo hacia arriba)
 
     pthread_mutex_lock(&fs_lock);
     if (!hay_bloques_libres(bloques_necesarios + 1))
-    {
+    { // Incluye el bloque de índice
         pthread_mutex_unlock(&fs_lock);
         log_error(logger, "No hay bloques suficientes para crear el archivo: %s", nombre_archivo);
-        return;
+        return -1; // Responder con error
     }
 
     // Reservar bloque de índice
@@ -221,7 +221,7 @@ void crear_archivo_dump(const char *nombre_archivo, const void *contenido, size_
     {
         pthread_mutex_unlock(&fs_lock);
         log_error(logger, "Error al asignar bloque de índice para el archivo: %s", nombre_archivo);
-        return;
+        return -1; // Responder con error
     }
 
     log_info(logger, "## Bloque asignado: %d - Archivo: %s - Bloques Libres: %d",
@@ -241,7 +241,7 @@ void crear_archivo_dump(const char *nombre_archivo, const void *contenido, size_
                 liberar_bloque(bloques_datos[j]);
             }
             pthread_mutex_unlock(&fs_lock);
-            return;
+            return -1; // Responder con error
         }
         log_info(logger, "## Bloque asignado: %d - Archivo: %s - Bloques Libres: %d",
                  bloques_datos[i], nombre_archivo, calcular_bloques_libres());
@@ -269,9 +269,13 @@ void crear_archivo_dump(const char *nombre_archivo, const void *contenido, size_
 
     pthread_mutex_unlock(&fs_lock);
 
+    // Crear el archivo de metadata
     crear_archivo_metadata(nombre_archivo, tamanio_archivo, bloque_indice);
+
     log_info(logger, "## Archivo Creado: %s - Tamaño: %zu", nombre_archivo, tamanio_archivo);
     log_info(logger, "## Fin de solicitud - Archivo: %s", nombre_archivo);
+
+    return 0; // Responder con éxito
 }
 
 #endif

@@ -24,6 +24,11 @@ bool coincidePidCpu(t_proceso *proceso)
     return (proceso->pid == proceso_buscado_cpu);
 }
 
+bool coincidePidFs(t_proceso *proceso)
+{
+    return (proceso->pid == proceso_buscado_fs);
+}
+
 t_hilo *obtener_hilo(int pid, int tid)
 {
     t_proceso *proceso = obtener_proceso(pid);

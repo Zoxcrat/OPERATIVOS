@@ -32,3 +32,4 @@ t_list *lista_particiones;
 t_list *lista_procesos_en_memoria;
 int proceso_buscado_cpu;
 int proceso_buscado_kernel;
+int proceso_buscado_fs;

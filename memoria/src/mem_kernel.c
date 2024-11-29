@@ -229,6 +229,13 @@ void atender_kernel()
             sleep(RETARDO_RESPUESTA);
             agregar_respuesta_enviar_paquete(paquete, respuesta);
             break;
+        case MEMORY_DUMP:
+            tid = recibir_entero(fd_kernel);
+            sleep(RETARDO_RESPUESTA);
+            generarMemoryDump(pid, tid);
+            respuesta = OK;
+            agregar_respuesta_enviar_paquete(paquete, respuesta);
+            break;
         case EXIT:
             control_key = 0;
             break;
