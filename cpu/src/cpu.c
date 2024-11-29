@@ -105,7 +105,8 @@ void *manejar_cliente_interrupt()
 
         if (interrupcion == 1)
         {
-            log_info(logger, "Interrupción recibida");
+            log_info(logger_obligatorio, "“## Llega interrupción al puerto Interrupt");
+
             interrupcion = 1;
         }
     }
@@ -154,7 +155,7 @@ void cpu_cycle()
 
 char *fetch()
 {
-    log_info(logger, "FETCH - Solicitando instrucción PC=%d", contexto->PC);
+    log_info(logger_obligatorio, "## <%d>:<%d>- FETCH- Program Counter: <%d>", pid_actual, tid_actual, contexto->PC);
 
     t_paquete *paquete = crear_paquete();
     agregar_a_paquete(paquete, &pid_actual, sizeof(int));
@@ -173,6 +174,7 @@ char *fetch()
 
 void decode(char *mensaje)
 {
+    log_info(logger_obligatorio, "## <%d>:<%d>- Ejecutando: %s", pid_actual, tid_actual, mensaje);
     // Tokenizamos el mensaje separando por espacios
     char *token = strtok(mensaje, " ");
 
@@ -213,6 +215,7 @@ void decode(char *mensaje)
 
 void execute()
 {
+
     switch (instruccion_actual->instruccion)
     {
         t_paquete *paquete;
@@ -234,7 +237,7 @@ void execute()
             // Asignar el valor leído al registro de datos
             set_valor_registro(instruccion_actual->parametro1, valor_leido);
 
-            log_info(logger, "READ MEM: Leído valor %d desde la dirección física %d", valor_leido, direccion_fis);
+            log_info(logger_obligatorio, "## <%d>: <%d>- Acción: <LEER> - Dirección Física: <%d>", pid_actual, tid_actual, direccion_fis);
         }
         else
         {
@@ -259,7 +262,8 @@ void execute()
         { // Verificar si no hubo segmentation fault
             // EScribir el valor desde la memoria física
             escribir_memoria(instruccion_actual->parametro2, direccion_fis);
-            log_info(logger, "READ MEM: Leído escrito en la dirección física %d", direccion_fis);
+
+            log_info(logger_obligatorio, "## <%d>: <%d>- Acción: <ESCRIBIR> - Dirección Física: <%d>", pid_actual, tid_actual, direccion_fis);
         }
         else
         {
@@ -288,6 +292,7 @@ void execute()
     case JNZ:
     {
         jnz_registro(instruccion_actual->parametro1, atoi(instruccion_actual->parametro2));
+        log_info(logger_obligatorio, "“## <%d>: <%d> - Actualizo Contexto Ejecución", pid_actual, tid_actual);
         break;
     }
     case LOG:

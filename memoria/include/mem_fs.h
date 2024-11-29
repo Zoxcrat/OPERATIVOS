@@ -3,6 +3,6 @@
 
 #include "mem_gestor.h"
 
-void generarMemoryDump(int pid, int tid);
+respuesta_pedido generarMemoryDump(int pid, int tid);
 
 #endif

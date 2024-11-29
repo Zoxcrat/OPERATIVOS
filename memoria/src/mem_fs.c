@@ -1,6 +1,6 @@
 #include "../include/mem_fs.h"
 
-void generarMemoryDump(int pid, int tid)
+respuesta_pedido generarMemoryDump(int pid, int tid)
 {
     t_contexto_ejecucion *contexto_completo = obtener_contexto(pid, tid);
     void *memoria_hilo = malloc(contexto_completo->limite);
@@ -12,6 +12,9 @@ void generarMemoryDump(int pid, int tid)
     agregar_a_paquete(paquete, contexto_completo->limite, sizeof(uint32_t));
     agregar_a_paquete(paquete, memoria_hilo, contexto_completo->limite);
     enviar_paquete(paquete, fd_filesystem);
+    respuesta_pedido respuesta;
+    recv(fd_filesystem, respuesta, sizeof(respuesta_pedido));
     free(contexto_completo);
     free(memoria_hilo);
+    return respuesta;
 }

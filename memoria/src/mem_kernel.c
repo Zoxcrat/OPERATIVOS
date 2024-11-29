@@ -41,12 +41,12 @@ t_particion *encontrar_particion_bestfit(int tamanio)
     return particion_elegida;
 }
 
-void asignar_memoria_estatica(t_proceso *proceso, t_particion *particion_elegida)
+void asignar_memoria_estatica(t_proceso *proceso, t_particion *particion_elegida, int tamanio)
 {
     particion_elegida->libre = false;
     proceso->contexto->base = particion_elegida->base;
     proceso->contexto->limite = particion_elegida->tamanio;
-    log_info(logger, "PARTICION ASIGNADA A PROCESO CON PID: %d, NUMERO: %d / TAMANIO PEDIDO: %d / TAMANIO DE LA PARTICION: %d", proceso->pid, particion_elegida->orden, proceso->contexto->limite, particion_elegida->tamanio);
+    log_info(logger, "PARTICION ASIGNADA A PROCESO CON PID: %d, NUMERO: %d / TAMANIO PEDIDO: %d / TAMANIO DE LA PARTICION: %d", proceso->pid, particion_elegida->orden, tamanio, particion_elegida->tamanio);
 }
 
 void asignar_memoria_dinamica(t_proceso *proceso, t_particion *particion_original, int tamanio_pedido)
@@ -95,7 +95,7 @@ respuesta_pedido asignar_memoria(int tamanio, t_proceso *proceso)
 
     if (strcmp(ESQUEMA, "FIJAS"))
     {
-        asignar_memoria_estatica(proceso, particion_elegida);
+        asignar_memoria_estatica(proceso, particion_elegida, tamanio);
     }
     else
     {
@@ -232,8 +232,7 @@ void atender_kernel()
         case MEMORY_DUMP:
             tid = recibir_entero(fd_kernel);
             sleep(RETARDO_RESPUESTA);
-            generarMemoryDump(pid, tid);
-            respuesta = OK;
+            respuesta = generarMemoryDump(pid, tid);
             agregar_respuesta_enviar_paquete(paquete, respuesta);
             break;
         case EXIT:

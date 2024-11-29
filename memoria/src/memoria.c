@@ -14,6 +14,7 @@ int main(int argc, char **argv)
 
     // Conexion con FS
     fd_filesystem = crear_conexion2(IP_FILESYSTEM, PUERTO_FILESYSTEM);
+
     if (fd_filesystem == -1)
     {
         log_error(logger, "Error al conectar con el módulo FILESYSEM");

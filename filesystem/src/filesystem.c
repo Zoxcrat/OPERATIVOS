@@ -74,29 +74,20 @@ void *procesar_peticion(void *arg)
     int socket_cliente = (int)(intptr_t)arg;
 
     // sacar datos de buffer
-    t_buffer buffer *int pid = recibir_entero(socket_cliente) int tid = recibir_entero(socket_cliente) int tamanio = recibir_entero(socket_cliente) char *contenido = malloc(tamanio) if (contenido == NULL)
-    {
-        enviar_mensaje("error", socket_cliente)
-    }
+    t_buffer buffer *int pid = recibir_entero(socket_cliente) int tid = recibir_entero(socket_cliente) int tamanio = recibir_entero(socket_cliente) void *contenido = malloc(tamanio) if (contenido == NULL){
+        enviar_mensaje(1, socket_cliente)} contenido = recibir_buffer(socket_cliente, tamanio)
 
-    char *nombre_archivo = generar_nombre_archivo(pid, tid) if (nombre_archivo == NULL)
+        char *nombre_archivo = generar_nombre_archivo(pid, tid) if (nombre_archivo == NULL)
     {
         log_error(logger, "Error al generar el nombre del archivo.");
         free(contenido);
-        enviar_mensaje("error", socket_cliente);
+        enviar_mensaje(1, socket_cliente);
         return NULL;
     }
 
     int respuesta = crear_archivo_dump(nombre_archivo, contenido, tamanio_archivo)
 
-        if (respuesta == 0)
-    {
-        enviar_mensaje("OK", socket_cliente);
-    }
-    else
-    {
-        enviar_mensaje("error", socket_cliente);
-    }
+        enviar_mensaje(respuesta, socket_cliente);
 
     free(contenido) return NULL;
 }

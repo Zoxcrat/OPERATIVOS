@@ -117,19 +117,20 @@ int crear_conexion2(char *ip, char *puerto)
 	freeaddrinfo(server_info);
 	if (error == -1)
 	{
-		perror("Error al conectarse");
+		// perror("Error al conectarse");
 		return -1;
 	}
 	return socket_cliente;
 }
 
-void enviar_contexto(t_contexto_ejecucion* contexto, int socket_cliente) {
-    // Serializamos la estructura t_contexto_ejecucion
-    int bytes = sizeof(t_contexto_ejecucion);
-    void *a_enviar = malloc(bytes);
-    memcpy(a_enviar, contexto, bytes);
-    
-    // Enviamos el contexto como un mensaje
-    send(socket_cliente, a_enviar, bytes, 0);
-    free(a_enviar);
+void enviar_contexto(t_contexto_ejecucion *contexto, int socket_cliente)
+{
+	// Serializamos la estructura t_contexto_ejecucion
+	int bytes = sizeof(t_contexto_ejecucion);
+	void *a_enviar = malloc(bytes);
+	memcpy(a_enviar, contexto, bytes);
+
+	// Enviamos el contexto como un mensaje
+	send(socket_cliente, a_enviar, bytes, 0);
+	free(a_enviar);
 }
