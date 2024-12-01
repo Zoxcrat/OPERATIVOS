@@ -33,12 +33,16 @@ int main(int argc, char **argv)
         case KERNEL:
             log_info(logger, "Se conecto el KERNEL");
             fd_kernel = fd_cliente;
-            atender_kernel();
+            pthread_t hilo_atencion_kernel;
+            pthread_create(&hilo_atencion_kernel, NULL, (void *)atender_kernel, NULL);
+            pthread_detach(hilo_atencion_kernel);
             break;
         case CPU:
             log_info(logger, "Se conecto la CPU");
             fd_cpu = fd_cliente;
-            atender_cpu();
+            pthread_t hilo_atencion_cpu;
+            pthread_create(&hilo_atencion_cpu, NULL, (void *)atender_cpu, NULL);
+            pthread_detach(hilo_atencion_cpu);
             break;
         default:
             log_error(logger, "No reconozco ese codigo");
