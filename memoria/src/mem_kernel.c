@@ -182,6 +182,62 @@ respuesta_pedido finalizar_hilo(int pid, int tid)
     return OK;
 }
 
+respuesta_pedido atender_peticion(int cod_op)
+{
+    int pid = recibir_entero(fd_kernel);
+    int tid;
+    int tamanio;
+    respuesta_pedido respuesta;
+    t_paquete *paquete;
+    switch (cod_op)
+    {
+    case INICIALIZAR_PROCESO:
+        tamanio = recibir_entero(fd_kernel);
+        respuesta = crear_proceso(pid, tamanio);
+        sleep(RETARDO_RESPUESTA);
+        paquete = crear_paquete();
+        agregar_respuesta_enviar_paquete(paquete, respuesta);
+        free(paquete);
+        break;
+    case FINALIZACION_PROCESO:
+        respuesta = finalizar_proceso(pid);
+        sleep(RETARDO_RESPUESTA);
+        paquete = crear_paquete();
+        agregar_respuesta_enviar_paquete(paquete, respuesta);
+        free(paquete);
+        break;
+    case CREACION_HILO:
+        tid = recibir_entero(fd_kernel);
+        tamanio = recibir_entero(fd_kernel);
+        char *nombre_archivo = malloc(tamanio);
+        recibir_buffer(nombre_archivo, tamanio);
+        respuesta = crear_hilo(pid, nombre_archivo);
+        sleep(RETARDO_RESPUESTA);
+        paquete = crear_paquete();
+        agregar_respuesta_enviar_paquete(paquete, respuesta);
+        free(paquete);
+        break;
+    case FINALIZACION_HILO:
+        tid = recibir_entero(fd_kernel);
+        respuesta = finalizar_hilo(pid, tid);
+        sleep(RETARDO_RESPUESTA);
+        paquete = crear_paquete();
+        agregar_respuesta_enviar_paquete(paquete, respuesta);
+        free(paquete);
+        break;
+    case MEMORY_DUMP:
+        tid = recibir_entero(fd_kernel);
+        sleep(RETARDO_RESPUESTA);
+        respuesta = generarMemoryDump(pid, tid);
+        paquete = crear_paquete();
+        agregar_respuesta_enviar_paquete(paquete, respuesta);
+        free(paquete);
+        break;
+    default:
+        log_error(logger, "No se entendio la operacion del Kernel");
+    }
+}
+
 // ----------------------------------------
 // CICLO DE ATENCION DE PROCESOS DEL KERNEL
 // ----------------------------------------
@@ -196,60 +252,12 @@ void atender_kernel()
     {
         int cod_op = recibir_operacion(fd_kernel);
         recibir_entero(fd_kernel);
-        int pid = recibir_entero(fd_kernel);
-        int tid;
-        int tamanio;
-        respuesta_pedido respuesta;
-        t_paquete *paquete;
-        switch (cod_op)
+        if (cod_op == EXIT)
         {
-        case INICIALIZAR_PROCESO:
-            tamanio = recibir_entero(fd_kernel);
-            respuesta = crear_proceso(pid, tamanio);
-            sleep(RETARDO_RESPUESTA);
-            paquete = crear_paquete();
-            agregar_respuesta_enviar_paquete(paquete, respuesta);
-            free(paquete);
-            break;
-        case FINALIZACION_PROCESO:
-            respuesta = finalizar_proceso(pid);
-            sleep(RETARDO_RESPUESTA);
-            paquete = crear_paquete();
-            agregar_respuesta_enviar_paquete(paquete, respuesta);
-            free(paquete);
-            break;
-        case CREACION_HILO:
-            tid = recibir_entero(fd_kernel);
-            tamanio = recibir_entero(fd_kernel);
-            char *nombre_archivo = malloc(tamanio);
-            recibir_buffer(nombre_archivo, tamanio);
-            respuesta = crear_hilo(pid, nombre_archivo);
-            sleep(RETARDO_RESPUESTA);
-            paquete = crear_paquete();
-            agregar_respuesta_enviar_paquete(paquete, respuesta);
-            free(paquete);
-            break;
-        case FINALIZACION_HILO:
-            tid = recibir_entero(fd_kernel);
-            respuesta = finalizar_hilo(pid, tid);
-            sleep(RETARDO_RESPUESTA);
-            paquete = crear_paquete();
-            agregar_respuesta_enviar_paquete(paquete, respuesta);
-            free(paquete);
-            break;
-        case MEMORY_DUMP:
-            tid = recibir_entero(fd_kernel);
-            sleep(RETARDO_RESPUESTA);
-            respuesta = generarMemoryDump(pid, tid);
-            paquete = crear_paquete();
-            agregar_respuesta_enviar_paquete(paquete, respuesta);
-            free(paquete);
-            break;
-        case EXIT:
             control_key = 0;
-            break;
-        default:
-            log_error(logger, "No se entendio la operacion del Kernel");
         }
+        pthread_t hilo_cliente;
+        pthread_create(&hilo_cliente, NULL, (void *)atender_peticion, (void *)cod_op);
+        pthread_detach(hilo_cliente);
     }
 }
