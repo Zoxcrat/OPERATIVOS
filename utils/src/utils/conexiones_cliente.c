@@ -99,15 +99,8 @@ void enviar_peticion(t_paquete *paquete, int socket_cliente, op_code codigo)
 
 void enviar_entero(int valor, int socket_cliente)
 {
-	char *msg = string_itoa(valor);
-	enviar_mensaje(msg, socket_cliente);
-}
-void enviar_entero_como_int(int valor, int socket_cliente)
-{
 	send(socket_cliente, &valor, sizeof(int), 0);
 }
-
-
 
 int crear_conexion2(char *ip, char *puerto)
 {

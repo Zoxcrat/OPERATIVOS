@@ -291,19 +291,11 @@ respuesta_pedido atender_peticion(int cod_op)
 void atender_kernel()
 {
     // Cuando llega una peticion del Kernel, se crea un hilo nuevo y se le delega el trabajo     bool control_key = 1;
-    bool control_key = 1;
     t_buffer *buffer;
 
-    while (control_key)
-    {
-        int cod_op = recibir_operacion(fd_kernel);
-        recibir_entero(fd_kernel);
-        if (cod_op == EXIT)
-        {
-            control_key = 0;
-        }
-        pthread_t hilo_cliente;
-        pthread_create(&hilo_cliente, NULL, (void *)atender_peticion, (void *)cod_op);
-        pthread_detach(hilo_cliente);
-    }
+    int cod_op = recibir_operacion(fd_kernel);
+    recibir_entero(fd_kernel);
+    atender_peticion(cod_op);
+
+    close(fd_kernel);
 }

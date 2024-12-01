@@ -9,8 +9,8 @@ int main(int argc, char **argv)
 
     inicializar_memoria();
 
-    //crear_proceso(0, 120);
-    //crear_hilo(0, "prueba.txt");
+    // crear_proceso(0, 120);
+    // crear_hilo(0, "prueba.txt");
 
     // Conexion con FS
     fd_filesystem = crear_conexion2(IP_FILESYSTEM, PUERTO_FILESYSTEM);
@@ -22,7 +22,8 @@ int main(int argc, char **argv)
     }
 
     int fd_cliente;
-    for (int i = 0; i < 3; i++)
+    bool controlKey = true;
+    while (controlKey)
     {
         log_info(logger, "Esperando Clientes...");
         fd_cliente = esperar_cliente(memoria_socket, logger);
@@ -36,6 +37,7 @@ int main(int argc, char **argv)
             pthread_t hilo_atencion_kernel;
             pthread_create(&hilo_atencion_kernel, NULL, (void *)atender_kernel, NULL);
             pthread_detach(hilo_atencion_kernel);
+            close(fd_kernel);
             break;
         case CPU:
             log_info(logger, "Se conecto la CPU");
