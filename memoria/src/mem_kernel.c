@@ -41,6 +41,39 @@ t_particion *encontrar_particion_bestfit(int tamanio)
     return particion_elegida;
 }
 
+t_particion *encontrar_particion_worstfit(int tamanio)
+{
+    t_particion *particion_elegida = NULL;
+    for (int i = 0; i < list_size(lista_particiones); i++)
+    {
+        t_particion *particion_actual = list_get(lista_particiones, i);
+
+        // Si no elegi una particion aun \\ si encontre una particion que se ajuste mejor, cambio la que encontre por la que habia elegido previamente.
+        if ((!particion_elegida || particion_actual->tamanio > particion_elegida->tamanio) && particion_actual->tamanio >= tamanio && particion_actual->libre)
+        {
+            particion_elegida = particion_actual;
+        }
+    }
+    return particion_elegida;
+}
+
+t_particion *encontrar_particion_firstfit(int tamanio)
+{
+    t_particion *particion_elegida = NULL;
+    for (int i = 0; i < list_size(lista_particiones); i++)
+    {
+        t_particion *particion_actual = list_get(lista_particiones, i);
+
+        // Si no elegi una particion aun \\ si encontre una particion que se ajuste mejor, cambio la que encontre por la que habia elegido previamente.
+        if (!particion_elegida && particion_actual->tamanio >= tamanio && particion_actual->libre)
+        {
+            particion_elegida = particion_actual;
+            break;
+        }
+    }
+    return particion_elegida;
+}
+
 void asignar_memoria_estatica(t_proceso *proceso, t_particion *particion_elegida, int tamanio)
 {
     particion_elegida->libre = false;
@@ -85,7 +118,20 @@ respuesta_pedido asignar_memoria(int tamanio, t_proceso *proceso)
         return ERROR;
     }
 
-    t_particion *particion_elegida = encontrar_particion_bestfit(tamanio);
+    t_particion *particion_elegida;
+
+    if (strcmp(ALGORITMO_BUSQUEDA, "BESTFIT"))
+    {
+        particion_elegida = encontrar_particion_bestfit(tamanio);
+    }
+    else if (strcmp(ALGORITMO_BUSQUEDA, "WORSTFIT"))
+    {
+        particion_elegida = encontrar_particion_worstfit(tamanio);
+    }
+    else
+    {
+        particion_elegida = encontrar_particion_firstfit(tamanio);
+    }
 
     if (!particion_elegida)
     {
@@ -131,9 +177,9 @@ void compactar_memoria()
         t_particion *particion_siguiente = list_get(lista_particiones, i + 1);
         if (particion_actual->libre && particion_siguiente->libre)
         {
-            // Esto funciona pues, al finalizar un proceso, nunca voy a tener 3 espacios de memoria libres y consecutivos.
             particion_actual->tamanio += particion_siguiente->tamanio;
             list_remove_and_destroy_element(lista_particiones, i + 1, (void *)free);
+            compactar_memoria(); // Uso recursivo para atajar el caso de 3 particiones libres juntas. Cuando no hay particiones libres consecutivas, va a cortar solo.
         }
     }
 }
