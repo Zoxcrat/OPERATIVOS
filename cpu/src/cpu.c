@@ -48,7 +48,8 @@ void leer_config()
 bool generar_conexiones()
 {
     fd_memoria = crear_conexion2(IP_MEMORIA, PUERTO_MEMORIA);
-    enviar_entero(1, fd_memoria);
+    enviar_mensaje("hola memoria, soy cpi", fd_memoria);
+    enviar_entero_como_int(1, fd_memoria);
     pthread_create(&conexion_memoria, NULL, (void *)pedir_contexto_a_memoria, (void *)&fd_memoria);
     pthread_detach(conexion_memoria);
 

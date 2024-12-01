@@ -143,6 +143,7 @@ void eliminar_paquete(t_paquete *paquete);
 void enviar_peticion(t_paquete *paquete, int socket_cliente, op_code codigo);
 
 void enviar_entero(int valor, int socket_cliente);
+void enviar_entero_como_int(int valor, int socket_cliente);
 
 /**
  * Similar a crear_conexion, pero no envía un mensaje (para tener control sobre el handshake).

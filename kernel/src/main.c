@@ -155,6 +155,7 @@ bool generar_conexiones(){
 	pthread_t conexion_cpu_dispatch;
 
 	fd_memoria = crear_conexion2(IP_MEMORIA, PUERTO_MEMORIA);
+    enviar_mensaje("hola memoria, soy kernel",fd_memoria)
     enviar_entero(0, fd_memoria);
 
 	fd_cpu_interrupt = crear_conexion2(IP_CPU, PUERTO_CPU_INTERRUPT);
@@ -165,7 +166,7 @@ bool generar_conexiones(){
 	pthread_create(&conexion_cpu_dispatch, NULL, (void*) procesar_conexion_cpu_dispatch, (void*) &fd_cpu_dispatch);
 	pthread_detach(conexion_cpu_dispatch);
 
-	return fd_memoria != -1 && fd_cpu_interrupt != -1 && fd_cpu_dispatch != -1;
+	return fd_memoria != -1;
 }
 
 void procesar_conexion_cpu_dispatch() {
